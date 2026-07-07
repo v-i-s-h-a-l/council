@@ -1,5 +1,8 @@
 # Purchase Council Example
 
+> Outputs below are representative, not deterministic. On-device models may
+> produce different wording or emphasis across runs, even for the same input.
+
 ## Question
 
 > Should I buy a used road bike for $800?
