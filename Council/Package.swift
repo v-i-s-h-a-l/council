@@ -75,6 +75,13 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        .target(
+            name: "CouncilTestUtilities",
+            dependencies: ["CouncilCore"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .testTarget(
             name: "CouncilCoreTests",
             dependencies: ["CouncilCore"],
@@ -84,21 +91,21 @@ let package = Package(
         ),
         .testTarget(
             name: "CouncilAgentsTests",
-            dependencies: ["CouncilAgents"],
+            dependencies: ["CouncilAgents", "CouncilTestUtilities"],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ]
         ),
         .testTarget(
             name: "CouncilInferenceTests",
-            dependencies: ["CouncilInference"],
+            dependencies: ["CouncilInference", "CouncilTestUtilities"],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ]
         ),
         .testTarget(
             name: "CouncilMemoryTests",
-            dependencies: ["CouncilMemory"],
+            dependencies: ["CouncilMemory", "CouncilTestUtilities"],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ]
@@ -110,6 +117,7 @@ let package = Package(
                 "CouncilAgents",
                 "CouncilInference",
                 "CouncilMemory",
+                "CouncilTestUtilities",
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
