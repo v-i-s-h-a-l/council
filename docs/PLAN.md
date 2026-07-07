@@ -15,14 +15,15 @@
 - Agents: Frugal, Future Self, Systems Thinker, Pleasure Agent, Chair.
 - Input: voice or text describing a purchase.
 - Output: a perspective with trade-offs, blind spots, and dissent.
-- Memory: remember the decision and reasoning for future reference.
+- Minimal memory layer: episodic gist, temporal facts, memory inspector, and audit log.
+  > This is an acceleration driven by transparency: from the very first deliberation the user can inspect and edit what the council remembers and verify the audit chain.
+- Runtime constitutional enforcement remains future work; the current validator runs after synthesis and rejects verdict language or suppressed dissent.
 
-## Phase 2: Memory and Profile
+## Phase 2: Expanded Memory and Profile
 
-- Build the profile loader and memory layer.
-- Support values, goals, boundaries, and basic journal ingestion.
-- Implement temporal facts and purpose-bound access control.
-- Add a memory inspector so the user can see and edit what is known.
+- Expand profile ingestion: values, goals, boundaries, and basic journal ingestion.
+- SQLCipher full-database encryption.
+- Refine purpose-bound access control for richer profile data.
 
 ## Phase 3: Secretary Layer
 
