@@ -18,5 +18,7 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Council uses on-device speech recognition to transcribe your spoken questions without sending audio to remote servers.</string>
 </dict>
 </plist>
