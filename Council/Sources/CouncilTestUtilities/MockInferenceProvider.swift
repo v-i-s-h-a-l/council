@@ -16,13 +16,15 @@ public actor MockInferenceProvider: InferenceProvider {
     private let chunkDelayNanoseconds: UInt64
     private var callIndex: Int = 0
     public private(set) var calls: [[InferenceMessage]] = []
+    public private(set) var cancellationCount: Int = 0
 
     /// Creates a mock provider.
     ///
     /// - Parameters:
     ///   - cannedResponses: Responses to yield in order, one per `generate` call.
-    ///   - chunkDelayNanoseconds: Artificial delay before yielding each chunk,
-    ///     useful for testing cancellation. Defaults to 1 ms.
+    ///   - chunkDelayNanoseconds: Artificial delay after yielding each chunk
+    ///     before finishing the stream. Useful for testing cancellation because
+    ///     the producer remains active after the first chunk. Defaults to 1 ms.
     public init(
         cannedResponses: [String] = [""],
         chunkDelayNanoseconds: UInt64 = 1_000_000
@@ -43,19 +45,26 @@ public actor MockInferenceProvider: InferenceProvider {
             let producer = Task {
                 do {
                     try Task.checkCancellation()
+                    continuation.yield(response)
                     if chunkDelayNanoseconds > 0 {
                         try await Task.sleep(nanoseconds: chunkDelayNanoseconds)
                     }
-                    try Task.checkCancellation()
-                    continuation.yield(response)
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
                 }
             }
-            continuation.onTermination = { _ in
+            continuation.onTermination = { [weak self] _ in
                 producer.cancel()
+                guard let self else { return }
+                Task {
+                    await self.recordCancellation()
+                }
             }
         }
+    }
+
+    private func recordCancellation() {
+        cancellationCount += 1
     }
 }
