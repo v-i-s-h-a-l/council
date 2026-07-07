@@ -50,7 +50,7 @@ public actor GRDBAuditLog: AuditLog {
             let entry = try record.toEntry(key: hmacKey)
             let expectedHMAC = try Self.hmac(for: entry, key: hmacKey)
             guard record.hmac == expectedHMAC else { return false }
-            previousHash = try Self.hashCanonical(entry)
+            previousHash = record.hmac
         }
 
         return true
@@ -60,9 +60,7 @@ public actor GRDBAuditLog: AuditLog {
 
     private func latestHash() async throws -> String? {
         let records = try await allRecordsOrdered()
-        guard let last = records.last else { return nil }
-        let entry = try last.toEntry(key: hmacKey)
-        return try Self.hashCanonical(entry)
+        return records.last?.hmac
     }
 
     private func allRecordsOrdered() async throws -> [AuditLogRecord] {
@@ -104,11 +102,6 @@ public actor GRDBAuditLog: AuditLog {
         ]
 
         return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
-    }
-
-    private static func hashCanonical(_ entry: AuditEntry) throws -> String {
-        let data = try canonicalJSON(for: entry)
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func hmac(for entry: AuditEntry, key: SymmetricKey) throws -> String {
