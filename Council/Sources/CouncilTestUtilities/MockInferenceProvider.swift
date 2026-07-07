@@ -1,4 +1,5 @@
 import CouncilCore
+import Foundation
 
 /// Test-only mock inference provider returning canned strings or JSON.
 public actor MockInferenceProvider: InferenceProvider {
@@ -12,11 +13,22 @@ public actor MockInferenceProvider: InferenceProvider {
     }
 
     private let cannedResponses: [String]
+    private let chunkDelayNanoseconds: UInt64
     private var callIndex: Int = 0
     public private(set) var calls: [[InferenceMessage]] = []
 
-    public init(cannedResponses: [String] = [""]) {
+    /// Creates a mock provider.
+    ///
+    /// - Parameters:
+    ///   - cannedResponses: Responses to yield in order, one per `generate` call.
+    ///   - chunkDelayNanoseconds: Artificial delay before yielding each chunk,
+    ///     useful for testing cancellation. Defaults to 1 ms.
+    public init(
+        cannedResponses: [String] = [""],
+        chunkDelayNanoseconds: UInt64 = 1_000_000
+    ) {
         self.cannedResponses = cannedResponses
+        self.chunkDelayNanoseconds = chunkDelayNanoseconds
     }
 
     public func generate(
@@ -26,9 +38,21 @@ public actor MockInferenceProvider: InferenceProvider {
         calls.append(messages)
         let response = cannedResponses[min(callIndex, cannedResponses.count - 1)]
         callIndex += 1
+
         return AsyncThrowingStream { continuation in
-            continuation.yield(response)
-            continuation.finish()
+            Task {
+                do {
+                    try Task.checkCancellation()
+                    if chunkDelayNanoseconds > 0 {
+                        try await Task.sleep(nanoseconds: chunkDelayNanoseconds)
+                    }
+                    try Task.checkCancellation()
+                    continuation.yield(response)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
         }
     }
 }
