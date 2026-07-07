@@ -123,5 +123,18 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        .testTarget(
+            name: "CouncilUITests",
+            dependencies: [
+                "CouncilUI",
+                "CouncilCore",
+                "CouncilAgents",
+                "CouncilMemory",
+                "CouncilTestUtilities",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
     ]
 )
