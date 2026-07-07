@@ -46,8 +46,8 @@ public actor MockInferenceProvider: InferenceProvider {
                 do {
                     try Task.checkCancellation()
                     continuation.yield(response)
-                    if chunkDelayNanoseconds > 0 {
-                        try await Task.sleep(nanoseconds: chunkDelayNanoseconds)
+                    if self.chunkDelayNanoseconds > 0 {
+                        try await Task.sleep(nanoseconds: self.chunkDelayNanoseconds)
                     }
                     continuation.finish()
                 } catch {
