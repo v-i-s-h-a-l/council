@@ -295,10 +295,20 @@ public struct RouteSnapshot: Codable, Sendable {
     }
 }
 
+public struct DeniedRoute: Codable, Sendable {
+    public var route: ComputeRoute
+    public var reason: String
+
+    public init(route: ComputeRoute, reason: String) {
+        self.route = route
+        self.reason = reason
+    }
+}
+
 public struct RouteDecision: Codable, Sendable {
     public var selectedRoute: ComputeRoute
     public var providerMetadata: RouteSnapshot
-    public var deniedRoutes: [(ComputeRoute, String)]
+    public var deniedRoutes: [DeniedRoute]
     public var consentStatus: String
     public var dataClassClearance: String
     public var timestamp: Date
@@ -306,7 +316,7 @@ public struct RouteDecision: Codable, Sendable {
     public init(
         selectedRoute: ComputeRoute,
         providerMetadata: RouteSnapshot,
-        deniedRoutes: [(ComputeRoute, String)] = [],
+        deniedRoutes: [DeniedRoute] = [],
         consentStatus: String = "notRequired",
         dataClassClearance: String = "onDeviceOnly",
         timestamp: Date = Date()

@@ -28,3 +28,13 @@ secrets/
 # Local data that should not be committed
 local_data/
 profiles/
+
+# SwiftPM
+.build/
+Package.resolved
+xcuserdata/
+*.xcodeproj
+*.xcworkspace
+.derivedData/
+.swiftpm/
+

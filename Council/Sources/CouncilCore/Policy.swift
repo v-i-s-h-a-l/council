@@ -129,9 +129,9 @@ public struct ModelRoutingPolicy {
                 isLocal: true
             ),
             deniedRoutes: [
-                (.applePCC, "PCC not available in v1 for custom council inference."),
-                (.thirdPartyLocal, "No declared third-party local route."),
-                (.thirdPartyCloud, "Third-party cloud denied by default in v1."),
+                DeniedRoute(route: .applePCC, reason: "PCC not available in v1 for custom council inference."),
+                DeniedRoute(route: .thirdPartyLocal, reason: "No declared third-party local route."),
+                DeniedRoute(route: .thirdPartyCloud, reason: "Third-party cloud denied by default in v1."),
             ],
             consentStatus: "notRequired",
             dataClassClearance: "onDeviceOnly"
