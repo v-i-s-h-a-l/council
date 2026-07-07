@@ -52,9 +52,29 @@ final class CompositionRoot {
         let profile = try await profileService.load()
         let context = RoutableProfileContext(profile: profile)
 
-        let pool = ModelContainerPool()
+        let manifestService = ModelManifestService()
         let modelConfig = MLXModelConfiguration.default
-        self.inferenceProvider = MLXInferenceProvider(pool: pool, modelConfiguration: modelConfig)
+        let defaultModelID = modelConfig.modelConfiguration.name
+        await manifestService.register(
+            ModelManifest(
+                id: defaultModelID,
+                // Placeholder checksum for the default model. Replace with the
+                // verified SHA-256 digest of the downloaded model artifacts
+                // before shipping to production.
+                checksum: "sha256:PLACEHOLDER_VERIFY_BEFORE_SHIP"
+            )
+        )
+        await manifestService.grantConsent(id: defaultModelID)
+
+        let pool = ModelContainerPool(
+            modelConfiguration: modelConfig,
+            manifestService: manifestService
+        )
+        self.inferenceProvider = MLXInferenceProvider(
+            pool: pool,
+            modelConfiguration: modelConfig,
+            manifestService: manifestService
+        )
 
         self.deliberationService = DeliberationService(
             provider: inferenceProvider,
