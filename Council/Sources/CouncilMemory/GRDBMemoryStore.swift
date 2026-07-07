@@ -28,6 +28,20 @@ public actor GRDBMemoryStore: MemoryStore {
         try Self.registerMigrations(dbQueue: dbQueue)
     }
 
+    /// Creates a memory store at the given file path.
+    ///
+    /// The containing directory is created automatically. A 16-byte salt is generated and
+    /// persisted next to the database on first creation.
+    public static func make(path: String, profileKey: Data) async throws -> GRDBMemoryStore {
+        let url = URL(fileURLWithPath: path)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let dbQueue = try DatabaseQueue(path: path)
+        return try GRDBMemoryStore(dbQueue: dbQueue, profileKey: profileKey)
+    }
+
     // MARK: - Episodes
 
     public func saveEpisode(_ episode: EpisodicGist) async throws {

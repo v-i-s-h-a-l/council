@@ -14,6 +14,17 @@ public actor GRDBAuditLog: AuditLog {
         try DatabaseMigrator.migrator().migrate(dbQueue)
     }
 
+    /// Creates an audit log at the given file path.
+    public static func make(path: String, profileKey: Data) async throws -> GRDBAuditLog {
+        let url = URL(fileURLWithPath: path)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let dbQueue = try DatabaseQueue(path: path)
+        return try GRDBAuditLog(dbQueue: dbQueue, profileKey: profileKey)
+    }
+
     public func append(_ entry: AuditEntry) async throws {
         var mutableEntry = entry
         let previousHash = try await latestHash() ?? Self.genesisHash()
