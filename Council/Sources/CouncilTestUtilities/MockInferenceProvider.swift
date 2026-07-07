@@ -40,7 +40,7 @@ public actor MockInferenceProvider: InferenceProvider {
         callIndex += 1
 
         return AsyncThrowingStream { continuation in
-            Task {
+            let producer = Task {
                 do {
                     try Task.checkCancellation()
                     if chunkDelayNanoseconds > 0 {
@@ -52,6 +52,9 @@ public actor MockInferenceProvider: InferenceProvider {
                 } catch {
                     continuation.finish(throwing: error)
                 }
+            }
+            continuation.onTermination = { _ in
+                producer.cancel()
             }
         }
     }
