@@ -2,15 +2,29 @@ import CouncilCore
 import CryptoKit
 import Foundation
 import GRDB
+import Security
 
 /// `MemoryStore` implementation backed by GRDB with encrypted sensitive columns.
 public actor GRDBMemoryStore: MemoryStore {
+    enum GRDBMemoryStoreError: Error {
+        case saltGenerationFailed
+        case invalidSaltLength
+    }
+
     let dbQueue: DatabaseQueue
     private let databaseKey: Data
 
-    public init(dbQueue: DatabaseQueue, profileKey: Data) throws {
+    /// Creates a memory store.
+    ///
+    /// - Parameters:
+    ///   - dbQueue: The GRDB database queue.
+    ///   - profileKey: The profile key from which the database encryption key is derived.
+    ///   - salt: Optional 16-byte salt. If supplied, it is used directly. If omitted, the salt is
+    ///     loaded from `salt.bin` next to the database file, from the keychain as a fallback, or
+    ///     generated randomly and persisted in both locations on first creation.
+    public init(dbQueue: DatabaseQueue, profileKey: Data, salt: Data? = nil) throws {
         self.dbQueue = dbQueue
-        self.databaseKey = Self.deriveDatabaseKey(from: profileKey)
+        self.databaseKey = Self.deriveDatabaseKey(from: profileKey, salt: try Self.resolveSalt(dbQueue: dbQueue, injectedSalt: salt))
         try Self.registerMigrations(dbQueue: dbQueue)
     }
 
@@ -109,13 +123,60 @@ public actor GRDBMemoryStore: MemoryStore {
         }
     }
 
-    // MARK: - Key derivation
+    // MARK: - Salt resolution and key derivation
 
-    private static func deriveDatabaseKey(from profileKey: Data) -> Data {
+    private static func resolveSalt(dbQueue: DatabaseQueue, injectedSalt: Data?) throws -> Data {
+        if let injectedSalt {
+            guard injectedSalt.count == 16 else {
+                throw GRDBMemoryStoreError.invalidSaltLength
+            }
+            return injectedSalt
+        }
+
+        let path = dbQueue.path
+        if path.isEmpty || path == ":memory:" {
+            // In-memory database: generate an ephemeral salt that is not persisted.
+            return try generateRandomSalt()
+        }
+
+        let saltURL = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("salt.bin")
+        let saltKeychainItem = KeychainItem(service: "com.council.memory.salt", account: path)
+
+        if FileManager.default.fileExists(atPath: saltURL.path),
+           let salt = try? Data(contentsOf: saltURL),
+           salt.count == 16 {
+            return salt
+        }
+
+        if let salt = try saltKeychainItem.load(), salt.count == 16 {
+            // Restore the salt to the file as defense-in-depth.
+            try? salt.write(to: saltURL, options: .completeFileProtectionUnlessOpen)
+            return salt
+        }
+
+        let salt = try generateRandomSalt()
+        try salt.write(to: saltURL, options: .completeFileProtectionUnlessOpen)
+        try saltKeychainItem.save(data: salt)
+        return salt
+    }
+
+    private static func generateRandomSalt() throws -> Data {
+        var salt = Data(count: 16)
+        let status = salt.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, buffer.count, buffer.baseAddress!)
+        }
+        guard status == errSecSuccess else {
+            throw GRDBMemoryStoreError.saltGenerationFailed
+        }
+        return salt
+    }
+
+    private static func deriveDatabaseKey(from profileKey: Data, salt: Data) -> Data {
         let inputKey = SymmetricKey(data: profileKey)
         let info = Data("com.council.memory.database.v1".utf8)
         let derived = HKDF<SHA256>.deriveKey(
             inputKeyMaterial: inputKey,
+            salt: salt,
             info: info,
             outputByteCount: 32
         )

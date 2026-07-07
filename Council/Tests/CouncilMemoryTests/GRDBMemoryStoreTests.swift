@@ -7,10 +7,10 @@ import Testing
 
 struct GRDBMemoryStoreTests {
     private func makeStore() throws -> GRDBMemoryStore {
-        var rawKey = Data(count: 32)
-        _ = rawKey.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, $0.count, $0.baseAddress!) }
+        let rawKey = Data(repeating: 0xAA, count: 32)
+        let salt = Data(repeating: 0xBB, count: 16)
         let dbQueue = try DatabaseQueue()
-        return try GRDBMemoryStore(dbQueue: dbQueue, profileKey: rawKey)
+        return try GRDBMemoryStore(dbQueue: dbQueue, profileKey: rawKey, salt: salt)
     }
 
     @Test func saveAndLoadEpisode() async throws {
@@ -167,5 +167,40 @@ struct GRDBMemoryStoreTests {
         }
         let rawObject = records.first?.objectEncrypted ?? Data()
         #expect(String(data: rawObject, encoding: .utf8) != "12345.67")
+    }
+
+    @Test func differentSaltsProduceDifferentCiphertexts() async throws {
+        let rawKey = Data(repeating: 0xAB, count: 32)
+        let salt1 = Data(repeating: 0x01, count: 16)
+        let salt2 = Data(repeating: 0x02, count: 16)
+
+        let dbQueue1 = try DatabaseQueue()
+        let store1 = try GRDBMemoryStore(dbQueue: dbQueue1, profileKey: rawKey, salt: salt1)
+        let fact1 = TemporalFact(
+            subject: "user",
+            predicate: "owns",
+            object: "MacBook Pro",
+            accessScope: [.purchaseDeliberation]
+        )
+        try await store1.saveFact(fact1)
+
+        let dbQueue2 = try DatabaseQueue()
+        let store2 = try GRDBMemoryStore(dbQueue: dbQueue2, profileKey: rawKey, salt: salt2)
+        let fact2 = TemporalFact(
+            subject: "user",
+            predicate: "owns",
+            object: "MacBook Pro",
+            accessScope: [.purchaseDeliberation]
+        )
+        try await store2.saveFact(fact2)
+
+        let records1 = try await store1.dbQueue.read { db in
+            try TemporalFactRecord.fetchAll(db)
+        }
+        let records2 = try await store2.dbQueue.read { db in
+            try TemporalFactRecord.fetchAll(db)
+        }
+
+        #expect(records1.first?.objectEncrypted != records2.first?.objectEncrypted)
     }
 }
