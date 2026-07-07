@@ -1,5 +1,6 @@
 import XCTest
 import CouncilCore
+import MLXLMCommon
 @testable import CouncilInference
 
 final class ModelContainerPoolTests: XCTestCase {
@@ -109,5 +110,53 @@ final class ModelContainerPoolTests: XCTestCase {
         }
 
         await pool.return(first)
+    }
+
+    func testBorrowWithoutConsentThrows() async {
+        let manifestService = ModelManifestService()
+        let modelConfig = MLXModelConfiguration(
+            modelConfiguration: MLXLMCommon.ModelConfiguration(id: "test/uncensored-model")
+        )
+        await manifestService.register(
+            ModelManifest(id: modelConfig.modelConfiguration.name, checksum: "sha256:abc")
+        )
+
+        let pool = ModelContainerPool(
+            poolSize: 1,
+            modelConfiguration: modelConfig,
+            manifestService: manifestService
+        )
+
+        do {
+            _ = try await pool.borrow()
+            XCTFail("Expected modelNotConsented error")
+        } catch ModelContainerPoolError.modelNotConsented(let id) {
+            XCTAssertEqual(id, modelConfig.modelConfiguration.name)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testBorrowWithoutRegisteredChecksumThrows() async {
+        let manifestService = ModelManifestService()
+        let modelConfig = MLXModelConfiguration(
+            modelConfiguration: MLXLMCommon.ModelConfiguration(id: "test/no-checksum-model")
+        )
+        await manifestService.grantConsent(id: modelConfig.modelConfiguration.name)
+
+        let pool = ModelContainerPool(
+            poolSize: 1,
+            modelConfiguration: modelConfig,
+            manifestService: manifestService
+        )
+
+        do {
+            _ = try await pool.borrow()
+            XCTFail("Expected modelChecksumMissing error")
+        } catch ModelContainerPoolError.modelChecksumMissing(let id) {
+            XCTAssertEqual(id, modelConfig.modelConfiguration.name)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
     }
 }
