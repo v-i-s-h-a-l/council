@@ -1,0 +1,38 @@
+name: CouncilApp
+options:
+  bundleIdPrefix: com.council
+  deploymentTarget:
+    macOS: "14.0"
+packages:
+  Council:
+    path: ../Council
+targets:
+  CouncilApp:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Sources/CouncilApp
+    resources:
+      - Resources
+    info:
+      path: Resources/Info.plist
+    entitlements:
+      path: Resources/CouncilApp.entitlements
+    dependencies:
+      - package: Council
+        product: CouncilUI
+      - package: Council
+        product: CouncilCore
+      - package: Council
+        product: CouncilAgents
+      - package: Council
+        product: CouncilMemory
+      - package: Council
+        product: CouncilInference
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.council.app
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
