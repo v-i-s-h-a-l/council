@@ -84,4 +84,30 @@ final class ModelContainerPoolTests: XCTestCase {
         let worker = try await pool.borrow()
         await pool.return(worker)
     }
+
+    func testConcurrentBorrowUsesDistinctWorkers() async throws {
+        let pool = ModelContainerPool(
+            poolSize: 2,
+            loadWorker: {
+                ModelContainerWorker { _, _ in
+                    AsyncThrowingStream { continuation in
+                        continuation.yield("concurrent-stub")
+                        continuation.finish()
+                    }
+                }
+            }
+        )
+
+        let first = try await withThrowingTaskGroup(of: ModelContainerWorker.self) { group in
+            group.addTask { try await pool.borrow() }
+            group.addTask { try await pool.borrow() }
+            let workerA = try await group.next()!
+            let workerB = try await group.next()!
+            XCTAssertTrue(workerA !== workerB, "Concurrent borrows must return distinct worker references")
+            await pool.return(workerB)
+            return workerA
+        }
+
+        await pool.return(first)
+    }
 }
