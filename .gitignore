@@ -28,3 +28,18 @@ secrets/
 # Local data that should not be committed
 local_data/
 profiles/
+
+# SwiftPM
+.build/
+Package.resolved
+xcuserdata/
+*.xcodeproj
+*.xcworkspace
+.derivedData/
+.swiftpm/
+
+# CouncilApp generated Xcode project is committed as a deliverable.
+!CouncilApp/CouncilApp.xcodeproj/
+!CouncilApp/CouncilApp.xcodeproj/**
+CouncilApp/CouncilApp.xcodeproj/**/xcuserdata/
+

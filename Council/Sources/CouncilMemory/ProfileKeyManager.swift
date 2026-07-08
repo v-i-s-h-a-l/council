@@ -1,0 +1,167 @@
+import CryptoKit
+import Foundation
+import Security
+
+/// Manages the profile encryption key.
+///
+/// On Secure Enclave-capable devices, the key is generated inside the SEP and only a
+/// keychain reference to the private key is persisted; the raw profile key is wrapped
+/// with ECIES and stored in the keychain. On other devices the raw key is stored
+/// directly in the keychain.
+public actor ProfileKeyManager {
+    public enum ProfileKeyError: Error {
+        case missingKey
+        case keyGenerationFailed
+    }
+
+    /// Whether this device can bind keys to the Secure Enclave.
+    public let isDeviceBound: Bool
+
+    private let wrappedKeyItem: KeychainItem
+    private let seKeyAccount: String
+
+    public init(
+        service: String = "com.council.memory",
+        wrappedKeyAccount: String = "wrapped-profile-key",
+        seKeyAccount: String = "profile-se-key"
+    ) {
+        self.isDeviceBound = SecureEnclave.isAvailable
+        self.wrappedKeyItem = KeychainItem(service: service, account: wrappedKeyAccount)
+        self.seKeyAccount = seKeyAccount
+    }
+
+    /// Generates a new 256-bit profile key and persists it.
+    @discardableResult
+    public func generateKey() async throws -> Data {
+        var rawKey = Data(count: 32)
+        let status = rawKey.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, buffer.count, buffer.baseAddress!)
+        }
+        guard status == errSecSuccess else {
+            throw ProfileKeyError.keyGenerationFailed
+        }
+
+        if isDeviceBound {
+            do {
+                let sePrivateKey = try generateSecureEnclaveKey()
+                let wrapped = try SecureEnclaveWrapping.wrap(key: rawKey, sePrivateKey: sePrivateKey)
+                try wrappedKeyItem.save(data: wrapped)
+            } catch {
+                // -34018 is errSecMissingEntitlement. Unsigned binaries (including the SwiftPM
+                // test runner on macOS) lack the application-identifier entitlement required to
+                // create permanent Secure Enclave keychain keys. In that situation we safely fall
+                // back to storing the raw key in the keychain with device-only accessibility.
+                if (error as NSError).code == -34018 {
+                    try wrappedKeyItem.save(data: rawKey)
+                } else {
+                    throw error
+                }
+            }
+        } else {
+            try wrappedKeyItem.save(data: rawKey)
+        }
+
+        return rawKey
+    }
+
+    /// Unwraps and returns the persisted profile key.
+    public func unwrapKey() async throws -> Data {
+        guard let wrapped = try wrappedKeyItem.load() else {
+            throw ProfileKeyError.missingKey
+        }
+
+        if isDeviceBound {
+            do {
+                if let sePrivateKey = try loadSecureEnclaveKey() {
+                    return try SecureEnclaveWrapping.unwrap(wrappedKey: wrapped, sePrivateKey: sePrivateKey)
+                }
+            } catch {
+                // In entitlement-limited environments the SEP keychain query itself can fail;
+                // fall back to the raw key if it was stored directly.
+                if (error as NSError).code != -34018 {
+                    throw error
+                }
+            }
+            return wrapped
+        } else {
+            return wrapped
+        }
+    }
+
+    /// Removes persisted keys. Useful for testing and key rotation.
+    public nonisolated func deleteKeys() {
+        wrappedKeyItem.delete()
+        deleteSecureEnclaveKey()
+    }
+
+    // MARK: - Secure Enclave helpers
+
+    private func seKeyTag() -> Data {
+        Data(seKeyAccount.utf8)
+    }
+
+    /// Generates a permanent SEP key-agreement key and stores a keychain reference.
+    private func generateSecureEnclaveKey() throws -> SecKey {
+        let tag = seKeyTag()
+        // Ensure a stale key with the same tag does not block creation.
+        deleteSecureEnclaveKey()
+
+        var attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits as String: 256,
+            kSecAttrTokenID as String: kSecAttrTokenIDSecureEnclave,
+            kSecPrivateKeyAttrs as String: [
+                kSecAttrIsPermanent as String: true,
+                kSecAttrApplicationTag as String: tag,
+                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            ],
+        ]
+        #if os(macOS)
+        attributes[kSecUseDataProtectionKeychain as String] = true
+        #endif
+
+        var error: Unmanaged<CFError>?
+        guard let privateKey = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
+            if let error = error?.takeRetainedValue() {
+                throw error
+            }
+            throw ProfileKeyError.keyGenerationFailed
+        }
+        return privateKey
+    }
+
+    /// Loads the persisted SEP key reference, or `nil` if it does not exist.
+    private func loadSecureEnclaveKey() throws -> SecKey? {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: seKeyTag(),
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecReturnRef as String: true,
+        ]
+        #if os(macOS)
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound {
+            return nil
+        }
+        guard status == errSecSuccess else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
+        return (result as! SecKey)
+    }
+
+    private nonisolated func deleteSecureEnclaveKey() {
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: Data(seKeyAccount.utf8),
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+        ]
+        #if os(macOS)
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
+        SecItemDelete(query as CFDictionary)
+    }
+}

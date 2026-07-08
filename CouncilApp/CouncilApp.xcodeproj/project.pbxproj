@@ -1,0 +1,372 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2654F872C359CB17A514CB4B /* CouncilInference in Frameworks */ = {isa = PBXBuildFile; productRef = A0D18648BC9C0D0BF3E3EB58 /* CouncilInference */; };
+		4C3F3472D3ED23CD99D2E5E2 /* CouncilCore in Frameworks */ = {isa = PBXBuildFile; productRef = FB61E5FCA3AE144246509B8D /* CouncilCore */; };
+		610F8369E66E6001F1172788 /* CouncilAgents in Frameworks */ = {isa = PBXBuildFile; productRef = C1008BE29CEAA5EF8E4A655E /* CouncilAgents */; };
+		62DDC170163443A58BE35F9F /* CouncilApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF3F5F09F52689B4C15FDB7 /* CouncilApp.swift */; };
+		7F041938239734E772E08444 /* CouncilUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1952E01B976F58C5B1940B49 /* CouncilUI */; };
+		85375C4748E9B6FDD606C265 /* CouncilMemory in Frameworks */ = {isa = PBXBuildFile; productRef = 3F02AA812B3C88A95F3761CB /* CouncilMemory */; };
+		8CAFF5061B50DD68BD30C66E /* CompositionRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B918C7123792CCD82F837EA /* CompositionRoot.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1B918C7123792CCD82F837EA /* CompositionRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompositionRoot.swift; sourceTree = "<group>"; };
+		2B47F04BD724F553BC1B0D0E /* CouncilApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CouncilApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7DF3F5F09F52689B4C15FDB7 /* CouncilApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CouncilApp.swift; sourceTree = "<group>"; };
+		C53D6BC8CF703398254FF6ED /* Council */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Council; path = ../Council; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C8BCBCC8A7531174D1259A28 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7F041938239734E772E08444 /* CouncilUI in Frameworks */,
+				4C3F3472D3ED23CD99D2E5E2 /* CouncilCore in Frameworks */,
+				610F8369E66E6001F1172788 /* CouncilAgents in Frameworks */,
+				85375C4748E9B6FDD606C265 /* CouncilMemory in Frameworks */,
+				2654F872C359CB17A514CB4B /* CouncilInference in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		233B8993702018A29AD75D4E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2B47F04BD724F553BC1B0D0E /* CouncilApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4B8EC9494F52B47D134602F6 /* CouncilApp */ = {
+			isa = PBXGroup;
+			children = (
+				1B918C7123792CCD82F837EA /* CompositionRoot.swift */,
+				7DF3F5F09F52689B4C15FDB7 /* CouncilApp.swift */,
+			);
+			name = CouncilApp;
+			path = Sources/CouncilApp;
+			sourceTree = "<group>";
+		};
+		69D67E9DDB832459A5468470 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				C53D6BC8CF703398254FF6ED /* Council */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		9E2744F501D72CC987423E64 = {
+			isa = PBXGroup;
+			children = (
+				4B8EC9494F52B47D134602F6 /* CouncilApp */,
+				69D67E9DDB832459A5468470 /* Packages */,
+				233B8993702018A29AD75D4E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A2868EE6FB31796CACB0B129 /* CouncilApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 097E261ECE4EFD82CD7C665D /* Build configuration list for PBXNativeTarget "CouncilApp" */;
+			buildPhases = (
+				42645E69FDB58986B7EF5BEE /* Sources */,
+				C8BCBCC8A7531174D1259A28 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CouncilApp;
+			packageProductDependencies = (
+				1952E01B976F58C5B1940B49 /* CouncilUI */,
+				FB61E5FCA3AE144246509B8D /* CouncilCore */,
+				C1008BE29CEAA5EF8E4A655E /* CouncilAgents */,
+				3F02AA812B3C88A95F3761CB /* CouncilMemory */,
+				A0D18648BC9C0D0BF3E3EB58 /* CouncilInference */,
+			);
+			productName = CouncilApp;
+			productReference = 2B47F04BD724F553BC1B0D0E /* CouncilApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		03B3FD11F1CB658841539812 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 17A1F7839BF97802F7C1963B /* Build configuration list for PBXProject "CouncilApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 9E2744F501D72CC987423E64;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				839D4B128F509D0C0FBA815E /* XCLocalSwiftPackageReference "../Council" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 233B8993702018A29AD75D4E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A2868EE6FB31796CACB0B129 /* CouncilApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		42645E69FDB58986B7EF5BEE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8CAFF5061B50DD68BD30C66E /* CompositionRoot.swift in Sources */,
+				62DDC170163443A58BE35F9F /* CouncilApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		4F731B0AE9656147342FDF76 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		6ABB77C52911D0EA11EA728F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/CouncilApp.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.council.app;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		956A4A8CD9382434A7D785BA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/CouncilApp.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.council.app;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C13997DB5C9C407C663A9543 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		097E261ECE4EFD82CD7C665D /* Build configuration list for PBXNativeTarget "CouncilApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6ABB77C52911D0EA11EA728F /* Debug */,
+				956A4A8CD9382434A7D785BA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		17A1F7839BF97802F7C1963B /* Build configuration list for PBXProject "CouncilApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C13997DB5C9C407C663A9543 /* Debug */,
+				4F731B0AE9656147342FDF76 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		839D4B128F509D0C0FBA815E /* XCLocalSwiftPackageReference "../Council" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Council;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1952E01B976F58C5B1940B49 /* CouncilUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CouncilUI;
+		};
+		3F02AA812B3C88A95F3761CB /* CouncilMemory */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CouncilMemory;
+		};
+		A0D18648BC9C0D0BF3E3EB58 /* CouncilInference */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CouncilInference;
+		};
+		C1008BE29CEAA5EF8E4A655E /* CouncilAgents */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CouncilAgents;
+		};
+		FB61E5FCA3AE144246509B8D /* CouncilCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CouncilCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 03B3FD11F1CB658841539812 /* Project object */;
+}
