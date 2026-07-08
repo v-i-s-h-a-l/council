@@ -84,6 +84,8 @@ open CouncilApp.xcodeproj
 
 Set the destination to **macOS 14+** or **iOS 17+** and build. The project embeds the local `Council` SwiftPM package.
 
+> Note: `xcodebuild` for the generated `CouncilApp.xcodeproj` is currently blocked by an upstream `mlx-swift` issue: the `CudaBuild` package plugin fails validation. `swift build` in `CouncilApp/` works, and the Xcode project can still be opened for editing. Physical-device and App Store builds are expected to work because `CudaBuild` is a host-side plugin dependency.
+
 ## Supported devices
 
 - macOS 14 or later.

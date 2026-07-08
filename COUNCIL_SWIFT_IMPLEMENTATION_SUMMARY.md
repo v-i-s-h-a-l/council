@@ -1,9 +1,10 @@
-# Council Swift Implementation — CLI Spec Lock Delivery Summary
+# Council Swift Implementation — CLI Spec Lock and Hardening Summary
 
 **Project:** v-i-s-h-a-l/council  
-**Branch:** `sdl/council-cli-spec-lock`  
-**Lifecycle record:** `b0b9d45a-5b0e-43f3-8621-2e9b4385f8a2`  
-**Task reference:** `cli-spec-lock`  
+**Branches:** `sdl/council-cli-spec-lock` (merged), `sdl/council-swift-hardening` (in progress)  
+**Lifecycle records:**
+- `b0b9d45a-5b0e-43f3-8621-2e9b4385f8a2` (cli-spec-lock, closed)
+- `95e897a9-8011-4ba0-ae9f-114d25551c7e` (hardening, open)
 **Date:** 2026-07-08  
 **Governing capabilities:** SDL, `capability-implementation-reviewer`, `capability-commit-author`  
 
@@ -11,11 +12,13 @@
 
 ## 1. Goal of this delivery
 
-Lock the product specification for the minimal command-line interface to Council and ship a working `council ask` executable. This is the first real Swift implementation of the Council runtime for iOS 17 / macOS 14; previous "migration" framing has been retired in favor of "implementation" naming.
+Lock the product specification for the minimal command-line interface to Council, ship a working `council ask` executable, and complete the production-hardening steps for the first Swift implementation. This is the first real Swift implementation of the Council runtime for iOS 17 / macOS 14; previous "migration" framing has been retired in favor of "implementation" naming.
 
 ---
 
 ## 2. What was delivered
+
+### CLI spec lock
 
 - **Locked CLI specification** at `planning/council-cli-spec.md`.
   - One subcommand: `council ask <question>`.
@@ -31,14 +34,18 @@ Lock the product specification for the minimal command-line interface to Council
   - File-based salt resolution so unsigned CLI binaries do not block on keychain authorization dialogs.
   - Optional `persist` flag on `deliberationService(provider:options:persist:)` to support `--no-persist`.
 - **MemoryService/AuditLog integration** into `DeliberationService`.
-  - Appends audit entries at each stage transition.
-  - Persists an `EpisodicGist` on `.presentation`.
 - **`CouncilCLI` executable target** in `Council/Package.swift`.
-  - Sources in `Council/Sources/CouncilCLI/` (`main.swift`, `AskCommand.swift`).
-  - Depends on `swift-argument-parser`.
-  - Correct exit codes: `0` success, `64` validation/usage, `2` runtime, `130` cancelled.
 - **`CouncilCLITests`** covering argument parsing, `--no-persist` behavior, formatting, memory-service operations, and mocked end-to-end deliberation.
-- **Updated documentation**: `README.md`, `docs/PLAN.md`.
+
+### Hardening
+
+- **Real artifact hash verification** via `ModelArtifactVerifier`.
+  - Verifies `model.safetensors` (single-file models) and sharded models via `model.safetensors.index.json`.
+  - Wired into `ModelContainerPool.borrow()` so downloaded bytes are checked against the registered checksum.
+  - Supports per-shard comma/semicolon-separated checksums or a single combined digest.
+- **`CouncilBenchmarks` test target** measuring first-opinion latency, end-to-end latency, and peak resident memory against AC16 thresholds.
+  - Skips automatically in the iOS Simulator and when `COUNCIL_RUN_BENCHMARKS` is unset.
+  - Auto-computes and registers the model checksum on first load so arbitrary models can be benchmarked.
 
 ---
 
@@ -49,6 +56,8 @@ cd Council && swift build      ✅ Build complete, Swift 6
 cd Council && swift test       ✅ 69 tests passed across 20 suites
 cd Council && swift run council ✅ CLI executable runs with echo provider
 cd CouncilApp && swift build   ✅ Build complete
+xcodebuild macOS               ❌ Blocked by upstream mlx-swift CudaBuild plugin validation
+xcodebuild iOS Simulator       ❌ Blocked by upstream mlx-swift CudaBuild plugin validation
 ```
 
 Sample CLI run:
@@ -65,20 +74,19 @@ Produces a deterministic echo perspective and persists the episode and audit tra
 
 ## 4. Sibling-agent review
 
-| Review | Capability | Verdict | Notes |
+| Phase | Capability | Verdict | Notes |
 |---|---|---|---|
-| Pre-merge | `capability-implementation-reviewer` | Pending | Findings from exhaustive review will be addressed in this PR. |
+| CLI spec lock | `capability-implementation-reviewer` | `PASS_WITH_NOTES` | Blockers addressed in PR #5. |
+| Hardening | `capability-implementation-reviewer` | `PASS_WITH_NOTES` | Blockers addressed in PR #7: verification moved to load-time, sharded-model test added, lifecycle record paths corrected, docs reconciled. |
 
 ---
 
 ## 5. Known limitations and next steps
 
-The following items were intentionally deferred to a follow-up hardening phase:
-
-- **Real artifact hash verification** in `ModelContainerPool` is not yet implemented; although `CompositionRoot.swift` registers SHA-256 checksums for the default model per platform, downloaded bytes are not checked against the registered checksum.
-- **Performance benchmarks** for first-opinion latency, end-to-end latency, and peak memory are not yet implemented against AC16 thresholds.
-- **`xcodebuild` validation** for iOS Simulator and macOS has not been run for this branch.
+- **`xcodebuild` validation** for `CouncilApp.xcodeproj` is blocked by an upstream `mlx-swift` issue: the `CudaBuild` package plugin fails validation in both macOS and iOS Simulator builds. `swift build` in `CouncilApp/` succeeds, so the SwiftPM package itself is healthy.
+- **AC16 benchmark numbers** must be collected on reference hardware (physical iPhone / Apple Silicon Mac) with `COUNCIL_RUN_BENCHMARKS=1`.
 - **Additional CLI subcommands** (`profile`, `memory`, `model`, `audit`) remain out of scope for v0.1.x.
+- **Runtime constitutional enforcement** remains a future phase; current enforcement is prompt-based + validator-based.
 
 ---
 
@@ -102,6 +110,9 @@ swift run council ask "Should I buy a used road bike?" \
     --checksum sha256:<verified-digest> \
     --consent-download
 
+# Run on-device benchmarks
+COUNCIL_RUN_BENCHMARKS=1 swift test --filter CouncilBenchmarks
+
 # Build the macOS executable app target
 cd ../CouncilApp
 swift build
@@ -111,10 +122,11 @@ swift build
 
 ## 7. Tags and links
 
-- Branch: https://github.com/v-i-s-h-a-l/council/tree/sdl/council-cli-spec-lock
-- Pull request: https://github.com/v-i-s-h-a-l/council/pull/5
-- Lifecycle record (out-of-band): `~/.stibdedlom/records/v-i-s-h-a-l/council/b0b9d45a-5b0e-43f3-8621-2e9b4385f8a2.json`
-- Lifecycle record (repo-local): `registry/lifecycle/council-cli-spec-lock.json`
+- CLI spec-lock branch: https://github.com/v-i-s-h-a-l/council/tree/sdl/council-cli-spec-lock
+- CLI spec-lock PR: https://github.com/v-i-s-h-a-l/council/pull/5
+- Hardening branch: https://github.com/v-i-s-h-a-l/council/tree/sdl/council-swift-hardening
+- Lifecycle record (out-of-band): `~/.stibdedlom/records/v-i-s-h-a-l/council/`
+- Lifecycle record (repo-local): `registry/lifecycle/`
 
 ---
 
@@ -125,17 +137,19 @@ This work was routed through SDL capabilities:
 | Capability | Purpose | Outcome |
 |---|---|---|
 | `capability-workflow-router` | Classify intent and recommend capabilities | `execution`; `capability-implementation-reviewer` + `capability-commit-author` |
-| `capability-implementation-reviewer` | Independent pre-merge implementation review | Findings addressed in PR |
-| `capability-commit-author` | Logical commit grouping with SDL trailers | Used for all commits in this PR |
+| `capability-implementation-reviewer` | Independent pre-merge implementation review | `PASS_WITH_NOTES` for both phases |
+| `capability-commit-author` | Logical commit grouping with SDL trailers | Used for all cli-spec-lock commits; hardening commits from this phase include trailers |
 
-All commits in this PR include the required trailers:
+All commits in the cli-spec-lock phase and the new hardening commits include the required trailers:
 
 ```text
-Task-Ref: cli-spec-lock
-Lifecycle-Record-ID: b0b9d45a-5b0e-43f3-8621-2e9b4385f8a2
+Task-Ref: cli-spec-lock          # or council-swift-hardening
+Lifecycle-Record-ID: <record-id>
 SDL-Commit-Author: capability-commit-author
 ```
 
+The historical hardening commit `82d5389` predates strict SDL trailer enforcement and is retained as-is for history.
+
 ---
 
-*Delivered under SDL governance. Critical product decisions (CLI-first scope, deferral of model hardening) were taken and documented for later review.*
+*Delivered under SDL governance. Critical product decisions (CLI-first scope, local-first inference, deferral of custom models) were taken and documented for later review.*

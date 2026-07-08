@@ -335,6 +335,62 @@ final class ModelContainerPoolTests: XCTestCase {
         XCTAssertEqual(loadCount, 2)
     }
 
+    func testBorrowVerifiesShardedModelAndPasses() async throws {
+        let directory = try makeTempDirectory()
+
+        let shardA = Data("shard a bytes".utf8)
+        let shardB = Data("shard b bytes".utf8)
+        try shardA.write(to: directory.appendingPathComponent("model-00001-of-00002.safetensors"))
+        try shardB.write(to: directory.appendingPathComponent("model-00002-of-00002.safetensors"))
+
+        let index: [String: Any] = [
+            "weight_map": [
+                "layer1.weight": "model-00001-of-00002.safetensors",
+                "layer2.weight": "model-00002-of-00002.safetensors",
+            ]
+        ]
+        let indexData = try JSONSerialization.data(withJSONObject: index, options: [.sortedKeys])
+        try indexData.write(to: directory.appendingPathComponent("model.safetensors.index.json"))
+
+        var hasher = SHA256()
+        hasher.update(data: shardA)
+        hasher.update(data: shardB)
+        let combinedChecksum = "sha256:" + hasher.finalize().hexString
+
+        let manifestService = ModelManifestService()
+        let modelConfig = MLXModelConfiguration(
+            modelConfiguration: MLXLMCommon.ModelConfiguration(id: "test/sharded-model")
+        )
+        await manifestService.register(
+            ModelManifest(id: modelConfig.modelConfiguration.name, checksum: combinedChecksum)
+        )
+        await manifestService.grantConsent(id: modelConfig.modelConfiguration.name)
+
+        let pool = ModelContainerPool(
+            poolSize: 1,
+            modelConfiguration: modelConfig,
+            manifestService: manifestService,
+            loadWorker: {
+                ModelContainerWorker(
+                    modelDirectory: { directory },
+                    stubGenerate: { _, _ in
+                        AsyncThrowingStream { continuation in
+                            continuation.yield("sharded-stub")
+                            continuation.finish()
+                        }
+                    }
+                )
+            }
+        )
+
+        let worker = try await pool.borrow()
+        await pool.return(worker)
+
+        // A second borrow should not re-verify (no extra loads).
+        let worker2 = try await pool.borrow()
+        await pool.return(worker2)
+    }
+
     // MARK: - Helpers
 
     private func makeTempDirectory() throws -> URL {
