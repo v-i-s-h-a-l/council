@@ -51,6 +51,45 @@ public actor GRDBAuditLog: AuditLog {
         }
     }
 
+    public func entries(
+        since: Date?,
+        limit: Int?,
+        includePayloads: Bool
+    ) async throws -> [AuditEntry] {
+        if includePayloads {
+            let all = try await entries(for: nil)
+            let filtered = since.map { sinceDate in
+                all.filter { $0.timestamp >= sinceDate }
+            } ?? all
+            let sorted = filtered.sorted { $0.timestamp > $1.timestamp }
+            return limit.map { Array(sorted.prefix($0)) } ?? sorted
+        }
+
+        return try await dbQueue.read { db in
+            var request = AuditLogRecord
+                .select(AuditLogRecord.Columns.id, AuditLogRecord.Columns.sessionID, AuditLogRecord.Columns.timestamp, AuditLogRecord.Columns.category, AuditLogRecord.Columns.previousHash, AuditLogRecord.Columns.hmac)
+                .order(AuditLogRecord.Columns.timestamp.desc)
+            if let since {
+                request = request.filter(AuditLogRecord.Columns.timestamp >= since)
+            }
+            if let limit {
+                request = request.limit(limit)
+            }
+            let records = try request.fetchAll(db)
+            return records.map { record in
+                AuditEntry(
+                    id: record.id,
+                    sessionID: record.sessionID,
+                    timestamp: record.timestamp,
+                    category: AuditCategory(rawValue: record.category) ?? .error,
+                    payload: [:],
+                    previousHash: record.previousHash,
+                    hmac: record.hmac
+                )
+            }
+        }
+    }
+
     /// Verifies the integrity of the entire audit chain.
     public func verifyChain() async throws -> Bool {
         let records = try await allRecordsOrdered()

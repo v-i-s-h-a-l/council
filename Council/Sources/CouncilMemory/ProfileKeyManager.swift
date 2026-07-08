@@ -133,6 +133,12 @@ public actor ProfileKeyManager {
             try key.write(to: url)
         }
 
+        // Defense-in-depth: ensure the raw key file is readable only by the owner.
+        try FileManager.default.setAttributes(
+            [FileAttributeKey.posixPermissions: 0o600],
+            ofItemAtPath: url.path
+        )
+
         var resourceValues = URLResourceValues()
         resourceValues.isExcludedFromBackup = true
         var directoryURL = directory
