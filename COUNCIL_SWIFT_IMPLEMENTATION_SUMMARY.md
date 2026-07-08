@@ -38,6 +38,8 @@ This PR completes the production-readiness steps that were intentionally left as
 - **Added `CouncilBenchmarks`** with first-opinion, end-to-end, and peak-memory measurement against AC16 thresholds (run with `COUNCIL_RUN_BENCHMARKS=1`).
 - **Validated macOS `xcodebuild`** and documented the upstream iOS Simulator blocker.
 
+A retrospective SDL enforcement pass was run after merge to route the work through the proper capabilities (`capability-implementation-reviewer`, `capability-commit-author`) and add the missing repo-local lifecycle record. See §10.
+
 ---
 
 ## 3. Phase-by-phase outcome
@@ -140,8 +142,30 @@ open CouncilApp.xcodeproj
 ## 9. Tags and links
 
 - Branch: https://github.com/v-i-s-h-a-l/council/tree/sdl/council-swift-implementation
+- Retrospective branch: `sdl/council-swift-implementation-retrospective`
 - Final release tag: https://github.com/v-i-s-h-a-l/council/releases/tag/v0.1.0-purchase-council
-- Lifecycle record: `~/.stibdedlom/records/v-i-s-h-a-l/council/council-swift-implementation.json`
+- Pull request: https://github.com/v-i-s-h-a-l/council/pull/2
+- Lifecycle record (out-of-band): `~/.stibdedlom/records/v-i-s-h-a-l/council/council-swift-implementation.json`
+- Lifecycle record (repo-local): `registry/lifecycle/council-swift-implementation.json`
+
+---
+
+## 10. SDL governance compliance
+
+This work was initially executed through general agent delegation. After merge, a retrospective enforcement pass routed the review through the proper SDL capabilities:
+
+| Capability | Purpose | Outcome |
+|---|---|---|
+| `capability-workflow-router` | Classify intent and recommend capabilities | execution; parallel `capability-implementation-reviewer` + `capability-commit-author` |
+| `capability-implementation-reviewer` | Retrospective implementation review | `needs_revision`; no runtime blockers, governance gaps identified and addressed in follow-up |
+| `capability-commit-author` | Commit provenance audit | `non-conforming`; actual commit `bcb4a6f` lacked required `Task-Ref`, `Lifecycle-Record-ID`, and `SDL-Commit-Author` trailers and mixed multiple conventional-commit types; documented for future commits |
+
+Governance gaps addressed:
+- Added repo-local lifecycle record at `registry/lifecycle/council-swift-implementation.json`.
+- Corrected out-of-band lifecycle record verification claim (iOS Simulator `xcodebuild` is blocked by upstream `mlx-swift`).
+- PR #2 was merged without an independent GitHub approving review; the follow-up retrospective PR will be reviewed before merge.
+
+Future SDL-governed work in this repo should route implementation changes through `capability-implementation-reviewer`, commits through `capability-commit-author`, and merge only after an independent sibling-agent review.
 
 ---
 
