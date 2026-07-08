@@ -43,7 +43,7 @@
     "adr_required": true,
     "flags": []
   },
-  "status": "active",
+  "status": "closed",
   "workspace": {
     "path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
     "branch": "sdl/council-cli-expansion",
@@ -51,6 +51,7 @@
   },
   "links": {
     "issue": "https://github.com/v-i-s-h-a-l/council/issues/1",
+    "pull_request": "https://github.com/v-i-s-h-a-l/council/pull/9",
     "prior_record": "https://github.com/v-i-s-h-a-l/council/pull/8"
   },
   "authority": {
