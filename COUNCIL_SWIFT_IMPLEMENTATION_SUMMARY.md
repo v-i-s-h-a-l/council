@@ -77,7 +77,7 @@ Produces a deterministic echo perspective and persists the episode and audit tra
 | Phase | Capability | Verdict | Notes |
 |---|---|---|---|
 | CLI spec lock | `capability-implementation-reviewer` | `PASS_WITH_NOTES` | Blockers addressed in PR #5. |
-| Hardening | `capability-implementation-reviewer` | `PASS_WITH_NOTES` | Blockers addressed in this phase: verification moved to load-time, sharded-model test added, lifecycle record paths corrected, docs reconciled. |
+| Hardening | `capability-implementation-reviewer` | `PASS_WITH_NOTES` | Blockers addressed in PR #7: verification moved to load-time, sharded-model test added, lifecycle record paths corrected, docs reconciled. |
 
 ---
 
