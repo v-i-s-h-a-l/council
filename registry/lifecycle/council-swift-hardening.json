@@ -4,7 +4,7 @@
   "task_ref": "council-swift-hardening",
   "branch": "sdl/council-swift-hardening",
   "actor": "Kimi Code CLI",
-  "revision": 2,
+  "revision": 3,
   "created_event": "sdl-govern-council-swift-hardening",
   "classification": "execution",
   "tier": 2,
@@ -30,7 +30,7 @@
     "adr_required": true,
     "flags": []
   },
-  "status": "open",
+  "status": "closed",
   "workspace": {
     "path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
     "branch": "sdl/council-swift-hardening",
@@ -68,6 +68,42 @@
     },
     "client_orchestrator_mutation_gate": "Satisfied by explicit user instruction to continue and authority envelope in this lifecycle record."
   },
-  "retrospective_reviews": [],
+  "retrospective_reviews": [
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-16",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Artifact hash verification review: implementation correct and safely wired. Notes: add sharded-model test coverage and consider de-duplicating checksum computation.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-17",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Benchmark design review: blocked on repeated verification at borrow time. Fixed by moving verification to load-time. Notes: define first-opinion latency precisely and validate on reference hardware.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-18",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Documentation and xcodebuild blocker review: blocked on lifecycle record path accuracy and summary inconsistencies. Fixed. xcodebuild failure reproduced and documented as upstream mlx-swift CudaBuild plugin issue.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-19",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "SDL governance review: blocked on open lifecycle record, missing PR link, and stale touched_paths. All fixed; commits include required SDL trailers.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-20",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Focused re-review after fixes: load-time verification confirmed, lifecycle record paths corrected, PR #7 link added, working tree committed.",
+      "date": "2026-07-08"
+    }
+  ],
   "audit_hash": ""
 }
