@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.3.0",
+  "id": "95e897a9-8011-4ba0-ae9f-114d25551c7e",
+  "task_ref": "council-swift-hardening",
+  "branch": "sdl/council-swift-hardening",
+  "actor": "Kimi Code CLI",
+  "revision": 2,
+  "created_event": "sdl-govern-council-swift-hardening",
+  "classification": "execution",
+  "tier": 2,
+  "preflight": {
+    "touched_paths": [
+      "Council/Sources/CouncilInference/ModelManifestService.swift",
+      "Council/Sources/CouncilInference/ModelArtifactVerifier.swift",
+      "Council/Sources/CouncilInference/ModelContainerPool.swift",
+      "Council/Sources/CouncilInference/ModelContainerWorker.swift",
+      "Council/Sources/CouncilInference/MLXInferenceProvider.swift",
+      "Council/Tests/CouncilInferenceTests/ModelContainerPoolTests.swift",
+      "Council/Tests/CouncilBenchmarks/CouncilBenchmarks.swift",
+      "CouncilApp/Sources/CouncilApp/CompositionRoot.swift",
+      "Council/Package.swift",
+      "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+      "README.md",
+      "docs/PLAN.md",
+      "registry/lifecycle/council-swift-hardening.json"
+    ],
+    "required_reviewers": [
+      "sibling-agent"
+    ],
+    "adr_required": true,
+    "flags": []
+  },
+  "status": "open",
+  "workspace": {
+    "path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
+    "branch": "sdl/council-swift-hardening",
+    "is_main_worktree": false
+  },
+  "links": {
+    "issue": "https://github.com/v-i-s-h-a-l/council/issues/1",
+    "pull_request": "",
+    "capability": "capability-implementation-reviewer",
+    "role": "implementation-reviewer",
+    "prior_record": "https://github.com/v-i-s-h-a-l/council/pull/5"
+  },
+  "authority": {
+    "allow_mutation": true,
+    "allowed_paths": [
+      "Council/Sources/CouncilInference/ModelManifestService.swift",
+      "Council/Sources/CouncilInference/ModelArtifactVerifier.swift",
+      "Council/Sources/CouncilInference/ModelContainerPool.swift",
+      "Council/Sources/CouncilInference/ModelContainerWorker.swift",
+      "Council/Sources/CouncilInference/MLXInferenceProvider.swift",
+      "Council/Tests/CouncilInferenceTests/ModelContainerPoolTests.swift",
+      "Council/Tests/CouncilBenchmarks/CouncilBenchmarks.swift",
+      "CouncilApp/Sources/CouncilApp/CompositionRoot.swift",
+      "Council/Package.swift",
+      "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+      "README.md",
+      "docs/PLAN.md",
+      "registry/lifecycle/council-swift-hardening.json"
+    ],
+    "approval_gate": "User asked to continue with the same SDL-governed instructions after the cli-spec-lock phase merged. Proceeding with the hardening phase: artifact hash verification, xcodebuild validation, and AC16 performance benchmarks.",
+    "branch_or_worktree_isolation": "sdl/council-swift-hardening",
+    "verification_and_rollback_plan": {
+      "verification": "swift build and swift test pass; ModelContainerPool verifies downloaded bytes once at worker-load time against registered SHA-256 checksums; xcodebuild validation attempted for macOS and iOS Simulator with upstream CudaBuild plugin failure documented; CouncilBenchmarks target measures first-opinion, end-to-end, and peak-memory against AC16 thresholds; sibling-agent review passes.",
+      "rollback_plan": "Delete branch sdl/council-swift-hardening and abandon associated PR; revert benchmark and verifier changes manually if merged."
+    },
+    "client_orchestrator_mutation_gate": "Satisfied by explicit user instruction to continue and authority envelope in this lifecycle record."
+  },
+  "retrospective_reviews": [],
+  "audit_hash": ""
+}
