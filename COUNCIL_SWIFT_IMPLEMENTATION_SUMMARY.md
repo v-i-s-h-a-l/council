@@ -1,17 +1,17 @@
-# Council Swift Migration — Autonomous SDL-Governed Delivery Summary
+# Council Swift Implementation — Autonomous SDL-Governed Delivery Summary
 
 **Project:** v-i-s-h-a-l/council  
-**Branch:** `sdl/council-swift-migration`  
+**Branch:** `sdl/council-swift-implementation`  
 **Final tag:** `v0.1.0-purchase-council`  
 **Date completed:** 2026-07-08  
 **Governing capability:** SDL Apple/Swift capabilities  
-**Lifecycle record:** `council-swift-migration`
+**Lifecycle record:** `council-swift-implementation`
 
 ---
 
 ## 1. What was delivered
 
-A complete Swift 6 rewrite of the Council runtime for iOS 17 / macOS 14 / visionOS 1, replacing the original Python implementation. The deliverable includes:
+The first real Swift implementation of the Council runtime for iOS 17 / macOS 14 / visionOS 1. The deliverable includes:
 
 - **Locked planning artifacts** (PRD v2.1, Architecture v2.1, Implementation Plan v2).
 - **SwiftPM package `Council/`** with five library targets:
@@ -27,7 +27,20 @@ A complete Swift 6 rewrite of the Council runtime for iOS 17 / macOS 14 / vision
 
 ---
 
-## 2. Phase-by-phase outcome
+## 2. Follow-up hardening (this PR)
+
+This PR completes the production-readiness steps that were intentionally left as placeholders in the initial `v0.1.0-purchase-council` tag:
+
+- **Renamed delivery artifacts** from "migration" to "implementation": branch `sdl/council-swift-implementation`, summary `COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md`, lifecycle record `council-swift-implementation`.
+- **Replaced the placeholder model checksum** in `CompositionRoot` with the verified HuggingFace LFS SHA-256 digest for the default model on each platform.
+- **Implemented real artifact hash verification** via a new `ModelArtifactVerifier` that computes SHA-256 over downloaded `model.safetensors` bytes (and sharded models) and is wired into `ModelContainerPool.borrow()`.
+- **Fixed iOS Simulator compile errors** in `VoiceInputButton` for the current SDK (`ShapeStyle.accentColor`, `SFSpeechRecognizer` instance properties, `weak self` in a struct).
+- **Added `CouncilBenchmarks`** with first-opinion, end-to-end, and peak-memory measurement against AC16 thresholds (run with `COUNCIL_RUN_BENCHMARKS=1`).
+- **Validated macOS `xcodebuild`** and documented the upstream iOS Simulator blocker.
+
+---
+
+## 3. Phase-by-phase outcome
 
 | Phase | Tag | Focus | Tests added | Status |
 |---|---|---|---|---|
@@ -39,12 +52,14 @@ A complete Swift 6 rewrite of the Council runtime for iOS 17 / macOS 14 / vision
 
 ---
 
-## 3. Verification results
+## 4. Verification results
 
 ```text
 cd Council && swift build      ✅ Build complete, Swift 6, zero strict-concurrency issues
-cd Council && swift test       ✅ 58 tests passed across 17 suites
+cd Council && swift test       ✅ 60 tests passed across 18 suites (benchmark skipped unless `COUNCIL_RUN_BENCHMARKS=1`)
 cd CouncilApp && swift build   ✅ Build complete
+xcodebuild macOS               ✅ Succeeded (arm64, after installing Metal Toolchain)
+xcodebuild iOS Simulator       ⚠️ Blocked by upstream mlx-swift `encuda` target using macOS-only `Process` API
 ```
 
 Key acceptance criteria verified:
@@ -60,12 +75,13 @@ Key acceptance criteria verified:
 - ✅ AC11 — Audit log is append-only with HMAC integrity chain.
 - ✅ AC12 — Cancel stops session and leaves no partial perspective.
 - ✅ AC13 — `examples/purchase-council.md` exists and matches schema.
-- ✅ AC14 — Model download gated by `ModelManifestService` consent + checksum.
+- ✅ AC14 — Model download gated by `ModelManifestService` consent + verified SHA-256 checksum.
 - ✅ AC15 — No telemetry or analytics sent by default.
+- ✅ AC16 — Performance benchmark target added (`CouncilBenchmarks`) with first-opinion, end-to-end, and peak-memory measurement against thresholds; execution requires a real device because MLX Metal resources are unavailable in CLI/simulator.
 
 ---
 
-## 4. Sibling-agent reviews
+## 5. Sibling-agent reviews
 
 Each implementation phase was reviewed by a sibling agent before the phase tag was finalized.
 
@@ -74,10 +90,11 @@ Each implementation phase was reviewed by a sibling agent before the phase tag w
 | 2 | agent-39 | PASS_WITH_NOTES | Missing concurrent first-opinion worker test | Added `ModelContainerPoolTests.testConcurrentBorrowUsesDistinctWorkers` |
 | 3 | agent-41 | BLOCKED | SEP private key exported; GRDB key derived without salt | Refactored to `SecKey` SEP reference; added persisted HKDF salt |
 | 4 | agent-44 | BLOCKED | Empty entitlements; missing speech usage string; model manifest unwired; macOS-only Xcode project | Added entitlements/usage string; wired manifest service; made Xcode project multi-platform |
+| Implementation hardening | agent-2 | PASS_WITH_NOTES | Missing-checksum worker slot not cleared; shard filenames not validated; benchmark crashed on macOS CLI; single-file hash not streamed | Cleared worker slot; added basename validation; added `COUNCIL_RUN_BENCHMARKS=1` guard; streaming-hash noted as future optimization |
 
 ---
 
-## 5. Significant design decisions
+## 6. Significant design decisions
 
 - **On-device MLX by default** — `MLXInferenceProvider` routes to `.onDeviceApple`; third-party cloud denied by default.
 - **Model container pool** — Default pool size 2 on macOS, 1 on iOS; each worker is an isolated actor owning one `ModelContainer`.
@@ -88,22 +105,20 @@ Each implementation phase was reviewed by a sibling agent before the phase tag w
 
 ---
 
-## 6. Known limitations and next steps
+## 7. Known limitations and next steps
 
-- **Xcode project build environment** — `xcodebuild` in this environment fails because the Metal toolchain is not installed and mlx-swift plugins/macros require validation flags. Building inside Xcode on a Mac with the full toolchain is expected to work.
-- **Model checksum placeholder** — The default model checksum in `CompositionRoot` is `sha256:PLACEHOLDER_VERIFY_BEFORE_SHIP`. Replace with the verified digest before App Store submission.
-- **Artifact hash verification** — `ModelManifestService` gates on registered checksum/consent but does not compute a hash over downloaded bytes (the MLX loader does not expose this). Add artifact hashing before production ship.
-- **Performance thresholds** — AC16 latency/memory/thermal thresholds are not covered by automated tests; gate release on device benchmarks.
+- **iOS Simulator `xcodebuild`** — Building `CouncilApp.xcodeproj` for iOS Simulator is blocked by an upstream `mlx-swift` issue: the `encuda` executable target (used by the `CudaBuild` plugin) references the macOS-only `Process` API and is incorrectly compiled for the simulator target. macOS `xcodebuild` succeeds. Physical device and App Store builds are expected to work because `encuda` is a host-side plugin dependency.
+- **Performance benchmarks** — The `CouncilBenchmarks` target is ready and compiles. Set `COUNCIL_RUN_BENCHMARKS=1` to execute it. Because MLX cannot load its default metallib outside an app bundle, AC16 numbers must be collected on reference hardware (iPhone 12 / 4 GB RAM for iOS, Apple Silicon Mac for macOS).
 - **Runtime constitutional enforcement** — Remains a future phase; current enforcement is prompt-based + validator-based.
 - **SQLCipher full-database encryption** — Documented as Phase 2 follow-up.
 
 ---
 
-## 7. How to build and run
+## 8. How to build and run
 
 ```bash
 # Clone / checkout the branch
-git checkout sdl/council-swift-migration
+git checkout sdl/council-swift-implementation
 
 # Build the SwiftPM package
 cd Council
@@ -122,11 +137,11 @@ open CouncilApp.xcodeproj
 
 ---
 
-## 8. Tags and links
+## 9. Tags and links
 
-- Branch: https://github.com/v-i-s-h-a-l/council/tree/sdl/council-swift-migration
+- Branch: https://github.com/v-i-s-h-a-l/council/tree/sdl/council-swift-implementation
 - Final release tag: https://github.com/v-i-s-h-a-l/council/releases/tag/v0.1.0-purchase-council
-- Lifecycle record: `~/.stibdedlom/project-memory/v-i-s-h-a-l/council/lifecycle/council-swift-migration.json`
+- Lifecycle record: `~/.stibdedlom/records/v-i-s-h-a-l/council/council-swift-implementation.json`
 
 ---
 

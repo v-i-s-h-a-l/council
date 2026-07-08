@@ -29,11 +29,11 @@ public struct VoiceInputButton: View {
             }
         }) {
             Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                .foregroundStyle(isEnabled ? .accentColor : .secondary)
+                .foregroundStyle(isEnabled ? Color.accentColor : .secondary)
         }
         .disabled(!isEnabled)
         .onAppear {
-            isEnabled = SFSpeechRecognizer.supportsOnDeviceRecognition
+            isEnabled = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))?.supportsOnDeviceRecognition ?? false
         }
     }
 
@@ -41,11 +41,11 @@ public struct VoiceInputButton: View {
         guard isEnabled else { return }
         guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US")) else { return }
         self.recognizer = recognizer
-        recognizer.requireOnDeviceRecognition = true
+        recognizer.requiresOnDeviceRecognition = true
 
         SFSpeechRecognizer.requestAuthorization { status in
-            Task { @MainActor [weak self] in
-                guard let self, status == .authorized else { return }
+            Task { @MainActor in
+                guard status == .authorized else { return }
 
                 self.isRecording = true
                 let request = SFSpeechAudioBufferRecognitionRequest()
@@ -63,9 +63,8 @@ public struct VoiceInputButton: View {
                 audioEngine.prepare()
                 try? audioEngine.start()
 
-                self.recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-                    Task { @MainActor [weak self] in
-                        guard let self else { return }
+                self.recognitionTask = recognizer.recognitionTask(with: request) { result, error in
+                    Task { @MainActor in
                         if let result {
                             let transcript = result.bestTranscription.formattedString
                             if result.isFinal {

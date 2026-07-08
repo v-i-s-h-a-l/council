@@ -55,13 +55,19 @@ final class CompositionRoot {
         let manifestService = ModelManifestService()
         let modelConfig = MLXModelConfiguration.default
         let defaultModelID = modelConfig.modelConfiguration.name
+
+        #if os(iOS)
+        let defaultChecksum = "sha256:f212cf6fb9923281a09c135e05d43a052ee5ef7121f5b1dc0b0fb2de80f97cfd"
+        #elseif os(macOS)
+        let defaultChecksum = "sha256:86110f368236b53cf4c2336f991a85703b17bcc60bb75f292b4002ec0219f071"
+        #else
+        let defaultChecksum = "sha256:f212cf6fb9923281a09c135e05d43a052ee5ef7121f5b1dc0b0fb2de80f97cfd"
+        #endif
+
         await manifestService.register(
             ModelManifest(
                 id: defaultModelID,
-                // Placeholder checksum for the default model. Replace with the
-                // verified SHA-256 digest of the downloaded model artifacts
-                // before shipping to production.
-                checksum: "sha256:PLACEHOLDER_VERIFY_BEFORE_SHIP"
+                checksum: defaultChecksum
             )
         )
         await manifestService.grantConsent(id: defaultModelID)

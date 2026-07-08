@@ -19,11 +19,13 @@ public actor ModelContainerWorker {
             InferenceOptions
         ) async throws -> AsyncThrowingStream<String, Error>
     )?
+    private let modelDirectoryProvider: (@Sendable () async throws -> URL)?
 
     /// Creates a worker backed by a real MLX model container.
     public init(container: MLXLMCommon.ModelContainer) {
         self.container = container
         self.stubGenerate = nil
+        self.modelDirectoryProvider = nil
     }
 
     /// Internal initializer for tests that need a stub worker without loading
@@ -36,6 +38,40 @@ public actor ModelContainerWorker {
     ) {
         self.container = nil
         self.stubGenerate = stubGenerate
+        self.modelDirectoryProvider = nil
+    }
+
+    /// Internal initializer for tests that exercise artifact verification
+    /// without loading a real MLX model.
+    internal init(
+        modelDirectory: @escaping @Sendable () async throws -> URL,
+        stubGenerate: @escaping @Sendable (
+            [InferenceMessage],
+            InferenceOptions
+        ) async throws -> AsyncThrowingStream<String, Error>
+    ) {
+        self.container = nil
+        self.stubGenerate = stubGenerate
+        self.modelDirectoryProvider = modelDirectory
+    }
+
+    /// Returns `true` if the worker wraps a real model container (or a test
+    /// equivalent) and can therefore provide a model directory for verification.
+    public func hasRealContainer() -> Bool {
+        container != nil || modelDirectoryProvider != nil
+    }
+
+    /// Resolves the local directory containing the downloaded model artifacts.
+    public func modelDirectory() async throws -> URL {
+        if let modelDirectoryProvider {
+            return try await modelDirectoryProvider()
+        }
+
+        guard let container else {
+            throw ModelContainerWorkerError.noContainer
+        }
+
+        return try await container.modelDirectory
     }
 
     /// Generates a streaming text response for the provided messages.

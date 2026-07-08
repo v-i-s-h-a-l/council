@@ -10,6 +10,7 @@ public enum ModelContainerPoolError: Error, Sendable {
     case poolExhausted
     case modelNotConsented(id: String)
     case modelChecksumMissing(id: String)
+    case modelChecksumMismatch(id: String, expected: String, actual: String)
 }
 
 /// Actor that manages a fixed-size pool of `ModelContainerWorker` instances.
@@ -82,12 +83,15 @@ public actor ModelContainerPool {
     /// Borrows an available worker, loading one lazily if needed.
     ///
     /// - Throws: `DeliberationError.thermalCritical` if the thermal state is
-    ///   `.critical`, or `ModelContainerPoolError.poolExhausted` if all workers
-    ///   are busy.
+    ///   `.critical`, `ModelContainerPoolError.poolExhausted` if all workers
+    ///   are busy, or `ModelContainerPoolError.modelChecksumMismatch` if the
+    ///   downloaded artifacts fail artifact verification.
     public func borrow() async throws -> ModelContainerWorker {
         if thermalBudget == .critical {
             throw DeliberationError.thermalCritical
         }
+
+        let modelID = modelConfiguration.modelConfiguration.name
 
         for index in 0..<poolSize {
             guard !busy.contains(index) else { continue }
@@ -96,8 +100,51 @@ public actor ModelContainerPool {
                 workers[index] = try await loadWorker()
             }
 
+            let worker = workers[index]!
+
+            if await worker.hasRealContainer() {
+                guard let expectedChecksum = await manifestService.checksum(for: modelID) else {
+                    workers[index] = nil
+                    throw ModelContainerPoolError.modelChecksumMissing(id: modelID)
+                }
+
+                let directory = try await worker.modelDirectory()
+                let verifier = ModelArtifactVerifier()
+
+                do {
+                    try verifier.verify(
+                        id: modelID,
+                        at: directory,
+                        expectedChecksum: expectedChecksum
+                    )
+                } catch let error as ModelArtifactVerifierError {
+                    workers[index] = nil
+
+                    switch error {
+                    case .checksumMismatch(_, let expected, let actual):
+                        throw ModelContainerPoolError.modelChecksumMismatch(
+                            id: modelID,
+                            expected: expected,
+                            actual: actual
+                        )
+                    case .missingArtifacts:
+                        throw ModelContainerPoolError.modelChecksumMismatch(
+                            id: modelID,
+                            expected: expectedChecksum,
+                            actual: "sha256:missing artifacts"
+                        )
+                    case .unsupportedChecksumFormat:
+                        throw ModelContainerPoolError.modelChecksumMismatch(
+                            id: modelID,
+                            expected: expectedChecksum,
+                            actual: "sha256:unsupported checksum format"
+                        )
+                    }
+                }
+            }
+
             busy.insert(index)
-            return workers[index]!
+            return worker
         }
 
         throw ModelContainerPoolError.poolExhausted
