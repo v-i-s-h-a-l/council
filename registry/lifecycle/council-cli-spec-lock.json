@@ -1,0 +1,119 @@
+{
+  "schema_version": "1.3.0",
+  "id": "b0b9d45a-5b0e-43f3-8621-2e9b4385f8a2",
+  "task_ref": "cli-spec-lock",
+  "branch": "sdl/council-cli-spec-lock",
+  "actor": "Kimi Code CLI",
+  "revision": 3,
+  "created_event": "sdl-govern-cli-spec-lock",
+  "classification": "execution",
+  "tier": 2,
+  "preflight": {
+    "touched_paths": [
+      "planning/council-cli-spec.md",
+      "docs/PLAN.md",
+      "README.md",
+      "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+      "Council/Package.swift",
+      "Council/Sources/CouncilCLI/",
+      "Council/Tests/CouncilCLITests/",
+      "Council/Sources/CouncilAgents/RuntimeAssembly.swift",
+      "Council/Sources/CouncilAgents/DeliberationService.swift",
+      "Council/Sources/CouncilAgents/PerspectiveFormatter.swift",
+      "Council/Sources/CouncilMemory/MemoryService.swift",
+      "Council/Sources/CouncilMemory/GRDBMemoryStore.swift",
+      "Council/Sources/CouncilMemory/ProfileKeyManager.swift",
+      "Council/Sources/CouncilInference/EchoInferenceProvider.swift",
+      "Council/Sources/CouncilInference/MLXModelConfiguration.swift",
+      "Council/Sources/CouncilTestUtilities/MockAuditLog.swift",
+      "CouncilApp/Sources/CouncilApp/CompositionRoot.swift",
+      "registry/lifecycle/council-cli-spec-lock.json"
+    ],
+    "required_reviewers": [
+      "sibling-agent"
+    ],
+    "adr_required": true,
+    "flags": []
+  },
+  "status": "ready_for_review",
+  "workspace": {
+    "path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
+    "branch": "sdl/council-cli-spec-lock",
+    "is_main_worktree": false
+  },
+  "links": {
+    "issue": "https://github.com/v-i-s-h-a-l/council/issues/1",
+    "pull_request": "",
+    "capability": "capability-implementation-reviewer",
+    "role": "implementation-reviewer",
+    "prior_record": "https://github.com/v-i-s-h-a-l/council/pull/3"
+  },
+  "authority": {
+    "allow_mutation": true,
+    "allowed_paths": [
+      "planning/council-cli-spec.md",
+      "docs/PLAN.md",
+      "README.md",
+      "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+      "Council/Package.swift",
+      "Council/Sources/CouncilCLI/",
+      "Council/Tests/CouncilCLITests/",
+      "Council/Sources/CouncilAgents/RuntimeAssembly.swift",
+      "Council/Sources/CouncilAgents/DeliberationService.swift",
+      "Council/Sources/CouncilAgents/PerspectiveFormatter.swift",
+      "Council/Sources/CouncilMemory/MemoryService.swift",
+      "Council/Sources/CouncilMemory/GRDBMemoryStore.swift",
+      "Council/Sources/CouncilMemory/ProfileKeyManager.swift",
+      "Council/Sources/CouncilInference/EchoInferenceProvider.swift",
+      "Council/Sources/CouncilInference/MLXModelConfiguration.swift",
+      "Council/Sources/CouncilTestUtilities/MockAuditLog.swift",
+      "CouncilApp/Sources/CouncilApp/CompositionRoot.swift",
+      "registry/lifecycle/council-cli-spec-lock.json"
+    ],
+    "approval_gate": "User explicitly chose Option B: spec lock plus minimal CouncilCLI executable, governed exhaustively with SDL, agent swarm, deep research, and sibling-agent review.",
+    "branch_or_worktree_isolation": "sdl/council-cli-spec-lock",
+    "verification_and_rollback_plan": {
+      "verification": "swift build and swift test pass for Council package (69 tests, 20 suites); new CouncilCLI executable builds and runs; planning docs are consistent and locked; sibling-agent review with exhaustive lenses passes and blockers are addressed.",
+      "rollback_plan": "Delete branch sdl/council-cli-spec-lock and abandon associated PR; revert README/docs changes manually if merged."
+    },
+    "client_orchestrator_mutation_gate": "Satisfied by explicit user instruction and authority envelope in this lifecycle record."
+  },
+  "retrospective_reviews": [
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-11",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Swift correctness and architecture review: three blockers identified (--no-persist not honored, CleanExit exit codes, MLX checksum missing). All blockers addressed in revision 3.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-12",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Security, privacy, and keychain/CLI behavior review: blocked on --no-persist privacy bug. Addressed by wiring persist flag through RuntimeAssembly. Key-file trade-off and MLX checksum gap documented as follow-up hardening.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-13",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "CLI spec compliance and UX review: blocked on --no-persist, exit codes, and MLX checksum. All addressed; spec updated to use exit code 64 for validation/usage errors.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-14",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "SDL governance and documentation accuracy review: blocked on untracked repo-local lifecycle record and summary claiming review already passed. Record staged in revision 3; summary corrected.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-15",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Focused re-review after fixes: four of five blockers fixed; remaining untracked lifecycle record resolved by staging. Summary exit-code doc inconsistency corrected.",
+      "date": "2026-07-08"
+    }
+  ],
+  "audit_hash": ""
+}
