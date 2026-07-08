@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "CouncilInference", targets: ["CouncilInference"]),
         .library(name: "CouncilMemory", targets: ["CouncilMemory"]),
         .library(name: "CouncilUI", targets: ["CouncilUI"]),
+        .executable(name: "council", targets: ["CouncilCLI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift.git", exact: "0.31.5"),
@@ -21,6 +22,7 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-huggingface", from: "0.9.0"),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.9.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.5.0"),
     ],
     targets: [
         .target(
@@ -34,7 +36,11 @@ let package = Package(
         ),
         .target(
             name: "CouncilAgents",
-            dependencies: ["CouncilCore"],
+            dependencies: [
+                "CouncilCore",
+                "CouncilMemory",
+                "CouncilInference",
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ]
@@ -146,6 +152,33 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .executableTarget(
+            name: "CouncilCLI",
+            dependencies: [
+                "CouncilCore",
+                "CouncilAgents",
+                "CouncilInference",
+                "CouncilMemory",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .unsafeFlags(["-parse-as-library"]),
+            ]
+        ),
+        .testTarget(
+            name: "CouncilCLITests",
+            dependencies: [
+                "CouncilCLI",
+                "CouncilCore",
+                "CouncilAgents",
+                "CouncilMemory",
+                "CouncilTestUtilities",
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

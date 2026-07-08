@@ -44,6 +44,26 @@ swift build
 swift test
 ```
 
+### Command-line interface
+
+```bash
+cd Council
+swift build
+swift run council ask "Should I buy a used road bike for $800?"
+```
+
+The CLI defaults to an echo provider so it works without downloading a model. For real on-device inference:
+
+```bash
+swift run council ask "Should I buy a used road bike for $800?" \
+    --provider mlx \
+    --model mlx-community/Qwen2.5-7B-Instruct-4bit \
+    --checksum sha256:<verified-digest> \
+    --consent-download
+```
+
+> Note: The CLI stores the profile key in a file inside `--profile-dir` so it can run without keychain entitlements. The Xcode app continues to use the Secure Enclave / Keychain when available.
+
 ### macOS executable (SwiftPM)
 
 ```bash

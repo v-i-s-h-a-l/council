@@ -14,19 +14,26 @@ public actor CryptoKitProfileVault: ProfileVault {
 
     public init(
         keyManager: ProfileKeyManager = ProfileKeyManager(),
-        fileManager: FileManager = .default
+        directoryURL: URL? = nil,
+        fileManager: FileManager = .default,
+        writingOptions: Data.WritingOptions = .completeFileProtectionUnlessOpen
     ) throws {
         self.keyManager = keyManager
         self.fileManager = fileManager
-        self.writingOptions = .completeFileProtectionUnlessOpen
-        guard let appSupport = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
-            throw VaultError.missingApplicationSupportDirectory
+        self.writingOptions = writingOptions
+
+        if let directoryURL {
+            self.fileURL = directoryURL.appendingPathComponent("vault.enc")
+        } else {
+            guard let appSupport = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first else {
+                throw VaultError.missingApplicationSupportDirectory
+            }
+            let profileDirectory = appSupport.appendingPathComponent("Profile", isDirectory: true)
+            self.fileURL = profileDirectory.appendingPathComponent("vault.enc")
         }
-        let profileDirectory = appSupport.appendingPathComponent("Profile", isDirectory: true)
-        self.fileURL = profileDirectory.appendingPathComponent("vault.enc")
     }
 
     /// Testable initializer that accepts a custom file URL and writing options.

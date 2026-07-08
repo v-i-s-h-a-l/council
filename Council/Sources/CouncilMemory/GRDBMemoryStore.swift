@@ -31,15 +31,24 @@ public actor GRDBMemoryStore: MemoryStore {
     /// Creates a memory store at the given file path.
     ///
     /// The containing directory is created automatically. A 16-byte salt is generated and
-    /// persisted next to the database on first creation.
-    public static func make(path: String, profileKey: Data) async throws -> GRDBMemoryStore {
+    /// persisted next to the database on first creation unless `salt` is supplied.
+    ///
+    /// - Parameters:
+    ///   - path: File path for the SQLite database.
+    ///   - profileKey: The profile key from which the database encryption key is derived.
+    ///   - salt: Optional 16-byte salt. When provided, keychain fallback is skipped.
+    public static func make(
+        path: String,
+        profileKey: Data,
+        salt: Data? = nil
+    ) async throws -> GRDBMemoryStore {
         let url = URL(fileURLWithPath: path)
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
         let dbQueue = try DatabaseQueue(path: path)
-        return try GRDBMemoryStore(dbQueue: dbQueue, profileKey: profileKey)
+        return try GRDBMemoryStore(dbQueue: dbQueue, profileKey: profileKey, salt: salt)
     }
 
     // MARK: - Episodes

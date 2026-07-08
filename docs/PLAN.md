@@ -16,6 +16,7 @@
 - Input: voice or text describing a purchase.
 - Output: a perspective with trade-offs, blind spots, and dissent.
 - Minimal memory layer: episodic gist, temporal facts, memory inspector, and audit log.
+- Add a minimal **`CouncilCLI`** executable for headless `council ask` usage. See `planning/council-cli-spec.md`.
   > This is an acceleration driven by transparency: from the very first deliberation the user can inspect and edit what the council remembers and verify the audit chain.
 - Runtime constitutional enforcement remains future work; the current validator runs after synthesis and rejects verdict language or suppressed dissent.
 
