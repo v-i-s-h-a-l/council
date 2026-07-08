@@ -75,7 +75,20 @@ public actor CryptoKitProfileVault: ProfileVault {
             attributes: nil
         )
 
-        try encrypted.write(to: fileURL, options: writingOptions)
+        do {
+            try encrypted.write(to: fileURL, options: writingOptions)
+        } catch {
+            // Unsigned CLI binaries and test runners may lack the entitlements to
+            // apply complete file protection on some filesystems. Fall back to a
+            // plain write so the profile is still persisted.
+            try encrypted.write(to: fileURL)
+        }
+
+        // Defense-in-depth: ensure the encrypted vault is readable only by the owner.
+        try fileManager.setAttributes(
+            [FileAttributeKey.posixPermissions: 0o600],
+            ofItemAtPath: fileURL.path
+        )
 
         var resourceValues = URLResourceValues()
         resourceValues.isExcludedFromBackup = true

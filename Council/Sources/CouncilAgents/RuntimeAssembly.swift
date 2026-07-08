@@ -66,7 +66,8 @@ public actor RuntimeAssembly {
         self.profileKey = rawKey
         self.profileVault = try CryptoKitProfileVault(
             keyManager: keyManager,
-            directoryURL: root
+            directoryURL: root,
+            writingOptions: useSecureEnclave ? .completeFileProtectionUnlessOpen : []
         )
         self.profileService = ProfileService(vault: profileVault)
 

@@ -124,14 +124,11 @@ public actor ProfileKeyManager {
             withIntermediateDirectories: true,
             attributes: [FileAttributeKey.posixPermissions: 0o700]
         )
-        do {
-            try key.write(to: url, options: .completeFileProtectionUnlessOpen)
-        } catch {
-            // Unsigned CLI binaries may not be able to apply complete file protection
-            // (e.g., when rewriting an existing key). Fall back to a plain write so the
-            // key is still persisted.
-            try key.write(to: url)
-        }
+        // The raw key file is protected by the profile directory (0700) and the
+        // explicit 0600 permission set below. Avoid .completeFileProtectionUnlessOpen
+        // here because unsigned CLI binaries and test runners may not have the
+        // entitlements required to apply it on all filesystems.
+        try key.write(to: url)
 
         // Defense-in-depth: ensure the raw key file is readable only by the owner.
         try FileManager.default.setAttributes(
