@@ -3,7 +3,7 @@ import Foundation
 
 /// In-memory actor conforming to `AuditLog` for testing.
 public actor MockAuditLog: AuditLog {
-    private var entries: [AuditEntry] = []
+    public private(set) var entries: [AuditEntry] = []
 
     public init() {}
 

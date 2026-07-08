@@ -56,6 +56,14 @@ public protocol MemoryStore: Sendable {
 public protocol AuditLog: Sendable {
     func append(_ entry: AuditEntry) async throws
     func entries(for sessionID: UUID?) async throws -> [AuditEntry]
+    func verifyChain() async throws -> Bool
+}
+
+public extension AuditLog {
+    func verifyChain() async throws -> Bool {
+        // Default implementation for audit logs that do not implement an HMAC chain.
+        true
+    }
 }
 
 // MARK: - Agent

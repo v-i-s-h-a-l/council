@@ -19,15 +19,19 @@ public actor ProfileKeyManager {
 
     private let wrappedKeyItem: KeychainItem
     private let seKeyAccount: String
+    private let keyFileURL: URL?
 
     public init(
         service: String = "com.council.memory",
         wrappedKeyAccount: String = "wrapped-profile-key",
-        seKeyAccount: String = "profile-se-key"
+        seKeyAccount: String = "profile-se-key",
+        useSecureEnclave: Bool = true,
+        keyFileURL: URL? = nil
     ) {
-        self.isDeviceBound = SecureEnclave.isAvailable
+        self.isDeviceBound = SecureEnclave.isAvailable && useSecureEnclave
         self.wrappedKeyItem = KeychainItem(service: service, account: wrappedKeyAccount)
         self.seKeyAccount = seKeyAccount
+        self.keyFileURL = keyFileURL
     }
 
     /// Generates a new 256-bit profile key and persists it.
@@ -39,6 +43,11 @@ public actor ProfileKeyManager {
         }
         guard status == errSecSuccess else {
             throw ProfileKeyError.keyGenerationFailed
+        }
+
+        if let keyFileURL {
+            try persistKeyToFile(rawKey, url: keyFileURL)
+            return rawKey
         }
 
         if isDeviceBound {
@@ -66,6 +75,15 @@ public actor ProfileKeyManager {
 
     /// Unwraps and returns the persisted profile key.
     public func unwrapKey() async throws -> Data {
+        if let keyFileURL {
+            guard FileManager.default.fileExists(atPath: keyFileURL.path),
+                  let data = FileManager.default.contents(atPath: keyFileURL.path),
+                  data.count == 32 else {
+                throw ProfileKeyError.missingKey
+            }
+            return data
+        }
+
         guard let wrapped = try wrappedKeyItem.load() else {
             throw ProfileKeyError.missingKey
         }
@@ -92,6 +110,33 @@ public actor ProfileKeyManager {
     public nonisolated func deleteKeys() {
         wrappedKeyItem.delete()
         deleteSecureEnclaveKey()
+        if let keyFileURL {
+            try? FileManager.default.removeItem(at: keyFileURL)
+        }
+    }
+
+    // MARK: - File-based key storage
+
+    private func persistKeyToFile(_ key: Data, url: URL) throws {
+        let directory = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: [FileAttributeKey.posixPermissions: 0o700]
+        )
+        do {
+            try key.write(to: url, options: .completeFileProtectionUnlessOpen)
+        } catch {
+            // Unsigned CLI binaries may not be able to apply complete file protection
+            // (e.g., when rewriting an existing key). Fall back to a plain write so the
+            // key is still persisted.
+            try key.write(to: url)
+        }
+
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        var directoryURL = directory
+        try directoryURL.setResourceValues(resourceValues)
     }
 
     // MARK: - Secure Enclave helpers
