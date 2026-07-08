@@ -7,7 +7,13 @@ struct CouncilCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "council",
         abstract: "A local, constitution-governed deliberation tool.",
-        subcommands: [AskCommand.self],
+        subcommands: [
+            AskCommand.self,
+            ProfileCommand.self,
+            MemoryCommand.self,
+            ModelCommand.self,
+            AuditCommand.self,
+        ],
         defaultSubcommand: AskCommand.self
     )
 }

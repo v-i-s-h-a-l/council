@@ -39,10 +39,45 @@ public actor MemoryService {
         try await auditLog.append(entry)
     }
 
-    /// Returns recent episodic gists, newest first.
+    /// Returns a single unlocked episodic gist by ID, if it exists.
+    public func episode(id: UUID) async throws -> EpisodicGist? {
+        let episodes = try await store.episodes(matching: MemoryFilter(locked: false))
+        return episodes.first { $0.id == id }
+    }
+
+    /// Returns recent unlocked episodic gists, newest first.
     public func recentEpisodes(limit: Int = 100) async throws -> [EpisodicGist] {
-        let episodes = try await store.episodes(matching: MemoryFilter())
+        let episodes = try await store.episodes(matching: MemoryFilter(locked: false))
         return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
+    }
+
+    /// Searches unlocked episodic gists by question substring, newest first.
+    public func searchEpisodes(query: String, limit: Int = 100) async throws -> [EpisodicGist] {
+        let episodes = try await store.episodes(matching: MemoryFilter(locked: false, subject: query))
+        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
+    }
+
+    // MARK: - Temporal fact management
+
+    @discardableResult
+    public func addFact(
+        subject: String,
+        predicate: String,
+        object: String,
+        accessScope: [AccessPurpose] = [.purchaseDeliberation]
+    ) async throws -> TemporalFact {
+        let fact = TemporalFact(
+            subject: subject,
+            predicate: predicate,
+            object: object,
+            accessScope: accessScope
+        )
+        try await store.saveFact(fact)
+        return fact
+    }
+
+    public func facts(subject: String? = nil) async throws -> [TemporalFact] {
+        try await store.temporalFacts(matching: MemoryFilter(locked: false, subject: subject))
     }
 
     /// Verifies the integrity of the audit chain.

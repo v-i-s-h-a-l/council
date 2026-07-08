@@ -12,11 +12,11 @@ struct AskCommand: AsyncParsableCommand {
         abstract: "Ask the Purchase Council a question."
     )
 
+    @OptionGroup
+    var options: GlobalOptions
+
     @Argument(help: "The purchase question to deliberate.")
     var question: String
-
-    @Option(help: "Directory for profile vault and databases.")
-    var profileDir: String?
 
     @Option(help: "Inference provider: echo (default) or mlx.")
     var provider: Provider = .echo
@@ -30,24 +30,12 @@ struct AskCommand: AsyncParsableCommand {
     @Flag(help: "Grant explicit consent to download the model.")
     var consentDownload = false
 
-    @Option(help: "Output format: text, markdown, or json.")
-    var format: OutputFormat = .text
-
     @Flag(help: "Skip saving the episodic gist and audit log.")
     var noPersist = false
-
-    @Flag(help: "Print stage progress to stderr.")
-    var verbose = false
 
     enum Provider: String, ExpressibleByArgument, CaseIterable {
         case echo
         case mlx
-    }
-
-    enum OutputFormat: String, ExpressibleByArgument, CaseIterable {
-        case text
-        case markdown
-        case json
     }
 
     func validate() throws {
@@ -62,16 +50,9 @@ struct AskCommand: AsyncParsableCommand {
     }
 
     func run() async throws {
-        let profileDirectory = try Self.resolveProfileDirectory(path: profileDir)
-        if verbose {
-            FileHandle.standardError.write(Data("Initializing runtime...\n".utf8))
-        }
-        let assembly = try await RuntimeAssembly(
-            rootDirectory: profileDirectory,
-            useSecureEnclave: false
-        )
-        if verbose {
-            FileHandle.standardError.write(Data("Runtime initialized.\n".utf8))
+        let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
+        if options.verbose {
+            CLIAssembly.writeToStderr("Runtime initialized.\n")
         }
 
         let inferenceProvider = try await Self.makeInferenceProvider(
@@ -106,12 +87,8 @@ struct AskCommand: AsyncParsableCommand {
         var cancelled = false
 
         for await state in stream {
-            if verbose {
-                var status = "Stage: \(state.stage.rawValue)"
-                if let errorMessage = state.errorMessage {
-                    status += " | Error: \(errorMessage)"
-                }
-                FileHandle.standardError.write(Data("\(status)\n".utf8))
+            if options.verbose {
+                CLIAssembly.writeToStderr("Stage: \(state.stage.rawValue)\n")
             }
 
             switch state.stage {
@@ -127,7 +104,7 @@ struct AskCommand: AsyncParsableCommand {
         }
 
         if cancelled {
-            FileHandle.standardError.write(Data("Cancelled.\n".utf8))
+            CLIAssembly.writeToStderr("Cancelled.\n")
             throw ExitCode(130)
         }
 
@@ -136,36 +113,16 @@ struct AskCommand: AsyncParsableCommand {
         }
 
         let output: String
-        switch format {
+        switch options.format {
         case .text:
             output = PerspectiveFormatter.text(perspective)
         case .markdown:
             output = PerspectiveFormatter.markdown(perspective)
         case .json:
-            output = try PerspectiveFormatter.json(perspective)
+            output = try CLIEncoder.json(perspective)
         }
 
         print(output)
-    }
-
-    private static func resolveProfileDirectory(path: String?) throws -> URL {
-        if let path {
-            let url = URL(fileURLWithPath: path)
-            try FileManager.default.createDirectory(
-                at: url,
-                withIntermediateDirectories: true
-            )
-            return url
-        }
-
-        guard let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
-            struct ProfileDirectoryError: Error {}
-            throw ProfileDirectoryError()
-        }
-        return appSupport.appendingPathComponent("Council", isDirectory: true)
     }
 
     private static func makeInferenceProvider(
@@ -191,13 +148,15 @@ struct AskCommand: AsyncParsableCommand {
                 ModelManifest(id: modelID, checksum: checksum)
             )
 
-            guard consentDownload else {
-                FileHandle.standardError.write(Data(
-                    "MLX provider requires explicit consent. Pass --consent-download.\n".utf8
-                ))
+            let alreadyConsented = await manifestService.isModelConsented(id: modelID)
+            if consentDownload {
+                await manifestService.grantConsent(id: modelID)
+            } else if !alreadyConsented {
+                CLIAssembly.writeToStderr(
+                    "MLX provider requires explicit consent. Pass --consent-download or run 'council model consent \(modelID)'.\n"
+                )
                 throw ExitCode(64)
             }
-            await manifestService.grantConsent(id: modelID)
 
             let pool = ModelContainerPool(
                 modelConfiguration: modelConfig,

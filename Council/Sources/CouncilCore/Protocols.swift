@@ -14,10 +14,15 @@ public protocol InferenceProvider: Sendable {
 // MARK: - Profile
 
 public protocol ProfileVault: Sendable {
+    var isDeviceBound: Bool { get async }
     func load() async throws -> UserProfile
     func save(_ profile: UserProfile) async throws
     func exportEncryptedBlob() async throws -> Data
     func replaceFromEncryptedBlob(_ data: Data) async throws
+}
+
+public extension ProfileVault {
+    var isDeviceBound: Bool { get async { false } }
 }
 
 // MARK: - Memory
@@ -56,6 +61,7 @@ public protocol MemoryStore: Sendable {
 public protocol AuditLog: Sendable {
     func append(_ entry: AuditEntry) async throws
     func entries(for sessionID: UUID?) async throws -> [AuditEntry]
+    func entries(since: Date?, limit: Int?, includePayloads: Bool) async throws -> [AuditEntry]
     func verifyChain() async throws -> Bool
 }
 
@@ -63,6 +69,18 @@ public extension AuditLog {
     func verifyChain() async throws -> Bool {
         // Default implementation for audit logs that do not implement an HMAC chain.
         true
+    }
+
+    func entries(since: Date?, limit: Int?, includePayloads: Bool) async throws -> [AuditEntry] {
+        var all = try await entries(for: nil)
+        if let since {
+            all = all.filter { $0.timestamp >= since }
+        }
+        let sorted = all.sorted { $0.timestamp > $1.timestamp }
+        if let limit {
+            return Array(sorted.prefix(limit))
+        }
+        return sorted
     }
 }
 
