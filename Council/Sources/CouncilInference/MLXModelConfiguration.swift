@@ -14,6 +14,11 @@ public struct MLXModelConfiguration: Sendable {
         self.modelConfiguration = modelConfiguration
     }
 
+    /// Creates a configuration for the given Hugging Face model identifier.
+    public init(modelIdentifier: String) {
+        self.modelConfiguration = MLXLMCommon.ModelConfiguration(id: modelIdentifier)
+    }
+
     /// Default MLX configuration for the current platform.
     ///
     /// - iOS: `mlx-community/Qwen2.5-3B-Instruct-4bit`
