@@ -72,7 +72,10 @@ public actor RuntimeAssembly {
         self.profileService = ProfileService(vault: profileVault)
 
         let dbPath = root.appendingPathComponent("memory.sqlite").path
-        let salt = try Self.resolveOrCreateSalt(at: root.appendingPathComponent("salt.bin"))
+        let salt = try Self.resolveOrCreateSalt(
+            at: root.appendingPathComponent("salt.bin"),
+            useCompleteProtection: useSecureEnclave
+        )
         self.memoryStore = try await GRDBMemoryStore.make(
             path: dbPath,
             profileKey: rawKey,
@@ -90,7 +93,10 @@ public actor RuntimeAssembly {
     /// Keeping salt resolution inside `RuntimeAssembly` lets the CLI run without
     /// blocking on keychain authorization dialogs that can hang in unsigned
     /// command-line binaries.
-    private static func resolveOrCreateSalt(at saltURL: URL) throws -> Data {
+    private static func resolveOrCreateSalt(
+        at saltURL: URL,
+        useCompleteProtection: Bool
+    ) throws -> Data {
         if FileManager.default.fileExists(atPath: saltURL.path),
            let salt = try? Data(contentsOf: saltURL),
            salt.count == 16 {
@@ -105,11 +111,16 @@ public actor RuntimeAssembly {
             throw SaltError.generationFailed
         }
 
-        do {
-            try salt.write(to: saltURL, options: .completeFileProtectionUnlessOpen)
-        } catch {
-            // Unsigned CLI binaries may not be able to apply complete file protection.
-            // Fall back to an unprotected write so the salt is still persisted.
+        if useCompleteProtection {
+            do {
+                try salt.write(to: saltURL, options: .completeFileProtectionUnlessOpen)
+            } catch {
+                // Fall back to an unprotected write so the salt is still persisted.
+                try salt.write(to: saltURL)
+            }
+        } else {
+            // Unsigned CLI binaries and test runners may lack the entitlements to
+            // apply complete file protection, so avoid it entirely in CLI mode.
             try salt.write(to: saltURL)
         }
         return salt

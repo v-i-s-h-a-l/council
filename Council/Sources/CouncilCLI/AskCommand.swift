@@ -88,11 +88,7 @@ struct AskCommand: AsyncParsableCommand {
 
         for await state in stream {
             if options.verbose {
-                var status = "Stage: \(state.stage.rawValue)"
-                if let errorMessage = state.errorMessage {
-                    status += " | Error: \(errorMessage)"
-                }
-                CLIAssembly.writeToStderr("\(status)\n")
+                CLIAssembly.writeToStderr("Stage: \(state.stage.rawValue)\n")
             }
 
             switch state.stage {
@@ -123,7 +119,7 @@ struct AskCommand: AsyncParsableCommand {
         case .markdown:
             output = PerspectiveFormatter.markdown(perspective)
         case .json:
-            output = try PerspectiveFormatter.json(perspective)
+            output = try CLIEncoder.json(perspective)
         }
 
         print(output)

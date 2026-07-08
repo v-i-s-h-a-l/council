@@ -14,10 +14,15 @@ public protocol InferenceProvider: Sendable {
 // MARK: - Profile
 
 public protocol ProfileVault: Sendable {
+    var isDeviceBound: Bool { get async }
     func load() async throws -> UserProfile
     func save(_ profile: UserProfile) async throws
     func exportEncryptedBlob() async throws -> Data
     func replaceFromEncryptedBlob(_ data: Data) async throws
+}
+
+public extension ProfileVault {
+    var isDeviceBound: Bool { get async { false } }
 }
 
 // MARK: - Memory

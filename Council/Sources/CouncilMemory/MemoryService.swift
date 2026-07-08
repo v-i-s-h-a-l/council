@@ -39,21 +39,21 @@ public actor MemoryService {
         try await auditLog.append(entry)
     }
 
-    /// Returns a single episodic gist by ID, if it exists.
+    /// Returns a single unlocked episodic gist by ID, if it exists.
     public func episode(id: UUID) async throws -> EpisodicGist? {
-        let episodes = try await store.episodes(matching: MemoryFilter())
+        let episodes = try await store.episodes(matching: MemoryFilter(locked: false))
         return episodes.first { $0.id == id }
     }
 
-    /// Returns recent episodic gists, newest first.
+    /// Returns recent unlocked episodic gists, newest first.
     public func recentEpisodes(limit: Int = 100) async throws -> [EpisodicGist] {
-        let episodes = try await store.episodes(matching: MemoryFilter())
+        let episodes = try await store.episodes(matching: MemoryFilter(locked: false))
         return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
     }
 
-    /// Searches episodic gists by question substring, newest first.
+    /// Searches unlocked episodic gists by question substring, newest first.
     public func searchEpisodes(query: String, limit: Int = 100) async throws -> [EpisodicGist] {
-        let episodes = try await store.episodes(matching: MemoryFilter(subject: query))
+        let episodes = try await store.episodes(matching: MemoryFilter(locked: false, subject: query))
         return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
     }
 
@@ -77,7 +77,7 @@ public actor MemoryService {
     }
 
     public func facts(subject: String? = nil) async throws -> [TemporalFact] {
-        try await store.temporalFacts(matching: MemoryFilter(subject: subject))
+        try await store.temporalFacts(matching: MemoryFilter(locked: false, subject: subject))
     }
 
     /// Verifies the integrity of the audit chain.

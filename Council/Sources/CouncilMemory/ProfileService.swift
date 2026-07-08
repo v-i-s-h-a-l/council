@@ -3,9 +3,9 @@ import Foundation
 
 /// Actor-isolated service exposing profile persistence operations.
 public actor ProfileService {
-    private let vault: CryptoKitProfileVault
+    private let vault: any ProfileVault
 
-    public init(vault: CryptoKitProfileVault) {
+    public init(vault: any ProfileVault) {
         self.vault = vault
     }
 

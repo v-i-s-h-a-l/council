@@ -30,31 +30,27 @@ enum CLIAssembly {
 
     /// Resolves an explicit profile directory or falls back to Application Support/Council.
     static func resolveProfileDirectory(path: String?) throws -> URL {
+        let url: URL
         if let path {
             let expanded = (path as NSString).expandingTildeInPath
             guard !expanded.isEmpty else {
                 throw AssemblyError.cannotResolveProfileDirectory
             }
-            let url = URL(fileURLWithPath: expanded, isDirectory: true)
-            try FileManager.default.createDirectory(
-                at: url,
-                withIntermediateDirectories: true,
-                attributes: nil
-            )
-            return url
+            url = URL(fileURLWithPath: expanded, isDirectory: true)
+        } else {
+            guard let appSupport = FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first else {
+                throw AssemblyError.missingApplicationSupportDirectory
+            }
+            url = appSupport.appendingPathComponent("Council", isDirectory: true)
         }
 
-        guard let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
-            throw AssemblyError.missingApplicationSupportDirectory
-        }
-        let url = appSupport.appendingPathComponent("Council", isDirectory: true)
         try FileManager.default.createDirectory(
             at: url,
             withIntermediateDirectories: true,
-            attributes: nil
+            attributes: [FileAttributeKey.posixPermissions: 0o700]
         )
         return url
     }
@@ -71,7 +67,11 @@ enum CLIAssembly {
             "profile.key",
             "salt.bin",
             "memory.sqlite",
+            "memory.sqlite-wal",
+            "memory.sqlite-shm",
             "memory.sqlite.audit",
+            "memory.sqlite.audit-wal",
+            "memory.sqlite.audit-shm",
             "vault.enc",
         ]
         for name in sensitiveFiles {

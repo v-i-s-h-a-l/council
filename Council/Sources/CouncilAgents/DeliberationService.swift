@@ -183,16 +183,37 @@ private actor DeliberationActor {
             await appendAudit(category: .cancellation, payload: [:])
             stateContinuation?.finish()
         } catch {
+            let safeError = Self.sanitizedErrorDescription(error)
             updateState {
                 $0.stage = .failed
-                $0.errorMessage = error.localizedDescription
+                $0.errorMessage = safeError
             }
             await appendAudit(
                 category: .error,
-                payload: ["message": error.localizedDescription]
+                payload: ["category": safeError]
             )
             stateContinuation?.finish()
         }
+    }
+
+    private static func sanitizedErrorDescription(_ error: Error) -> String {
+        // Avoid recording raw provider error strings that may contain paths,
+        // model identifiers, or other sensitive details. Surface only a stable
+        // category derived from the error type.
+        let typeName = String(describing: type(of: error))
+        if error is CancellationError {
+            return "cancelled"
+        }
+        if typeName.contains("Thermal") {
+            return "thermalLimit"
+        }
+        if typeName.contains("Validation") {
+            return "validationFailed"
+        }
+        if typeName.contains("Inference") || typeName.contains("MLX") || typeName.contains("Model") {
+            return "inferenceFailed"
+        }
+        return "deliberationFailed"
     }
 
     private func runSynthesisLoop(

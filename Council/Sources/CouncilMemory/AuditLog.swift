@@ -67,7 +67,14 @@ public actor GRDBAuditLog: AuditLog {
 
         return try await dbQueue.read { db in
             var request = AuditLogRecord
-                .select(AuditLogRecord.Columns.id, AuditLogRecord.Columns.sessionID, AuditLogRecord.Columns.timestamp, AuditLogRecord.Columns.category, AuditLogRecord.Columns.previousHash, AuditLogRecord.Columns.hmac)
+                .select(
+                    AuditLogRecord.Columns.id,
+                    AuditLogRecord.Columns.sessionID,
+                    AuditLogRecord.Columns.timestamp,
+                    AuditLogRecord.Columns.category,
+                    AuditLogRecord.Columns.previousHash,
+                    AuditLogRecord.Columns.hmac
+                )
                 .order(AuditLogRecord.Columns.timestamp.desc)
             if let since {
                 request = request.filter(AuditLogRecord.Columns.timestamp >= since)
@@ -75,16 +82,16 @@ public actor GRDBAuditLog: AuditLog {
             if let limit {
                 request = request.limit(limit)
             }
-            let records = try request.fetchAll(db)
-            return records.map { record in
+            let rows = try Row.fetchAll(db, request)
+            return rows.map { row in
                 AuditEntry(
-                    id: record.id,
-                    sessionID: record.sessionID,
-                    timestamp: record.timestamp,
-                    category: AuditCategory(rawValue: record.category) ?? .error,
+                    id: row[AuditLogRecord.Columns.id],
+                    sessionID: row[AuditLogRecord.Columns.sessionID],
+                    timestamp: row[AuditLogRecord.Columns.timestamp],
+                    category: AuditCategory(rawValue: row[AuditLogRecord.Columns.category]) ?? .error,
                     payload: [:],
-                    previousHash: record.previousHash,
-                    hmac: record.hmac
+                    previousHash: row[AuditLogRecord.Columns.previousHash],
+                    hmac: row[AuditLogRecord.Columns.hmac]
                 )
             }
         }
