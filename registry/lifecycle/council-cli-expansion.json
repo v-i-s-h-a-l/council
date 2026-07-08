@@ -4,7 +4,7 @@
   "task_ref": "council-cli-expansion",
   "branch": "sdl/council-cli-expansion",
   "actor": "Kimi Code CLI",
-  "revision": 2,
+  "revision": 3,
   "created_event": "sdl-govern-cli-expansion",
   "classification": "execution",
   "tier": 2,
@@ -22,7 +22,11 @@
       "Council/Sources/CouncilCLI/GlobalOptions.swift",
       "Council/Sources/CouncilCLI/CLIOutputFormat.swift",
       "Council/Sources/CouncilCLI/CLIEncoder.swift",
+      "Council/Sources/CouncilCLI/UUID+ExpressibleByArgument.swift",
+      "Council/Sources/CouncilAgents/RuntimeAssembly.swift",
+      "Council/Sources/CouncilAgents/DeliberationService.swift",
       "Council/Sources/CouncilMemory/ProfileService.swift",
+      "Council/Sources/CouncilMemory/CryptoKitProfileVault.swift",
       "Council/Sources/CouncilMemory/MemoryService.swift",
       "Council/Sources/CouncilMemory/AuditLog.swift",
       "Council/Sources/CouncilMemory/ProfileKeyManager.swift",
@@ -64,7 +68,11 @@
       "Council/Sources/CouncilCLI/GlobalOptions.swift",
       "Council/Sources/CouncilCLI/CLIOutputFormat.swift",
       "Council/Sources/CouncilCLI/CLIEncoder.swift",
+      "Council/Sources/CouncilCLI/UUID+ExpressibleByArgument.swift",
+      "Council/Sources/CouncilAgents/RuntimeAssembly.swift",
+      "Council/Sources/CouncilAgents/DeliberationService.swift",
       "Council/Sources/CouncilMemory/ProfileService.swift",
+      "Council/Sources/CouncilMemory/CryptoKitProfileVault.swift",
       "Council/Sources/CouncilMemory/MemoryService.swift",
       "Council/Sources/CouncilMemory/AuditLog.swift",
       "Council/Sources/CouncilMemory/ProfileKeyManager.swift",
@@ -83,6 +91,35 @@
     },
     "client_orchestrator_mutation_gate": "Satisfied by explicit user instruction and authority envelope in this lifecycle record."
   },
-  "retrospective_reviews": [],
+  "retrospective_reviews": [
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-30",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Swift/ArgumentParser correctness review: blocked on salt.bin complete-file-protection breaking CLI reuse. Fixed by threading useSecureEnclave through RuntimeAssembly.resolveOrCreateSalt. Non-blocking notes: WAL/SHM hardening, force-unwrap JSON, retroactive conformance style.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-31",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "Security/privacy review: blocked on locked memory exposed by default and raw provider error strings in stderr/audit. Fixed by defaulting MemoryService reads to locked:false and sanitizing DeliberationService/AskCommand error output.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-memory-router",
+      "agent": "agent-32",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "CLI UX/spec compliance review: blocked on AskCommand --format json not using shared CLIEncoder. Fixed. Non-blocking notes: model consent storage scope, markdown output parity, global-option placement.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-sentinel-audit",
+      "agent": "agent-33",
+      "verdict": "PASS_WITH_NOTES",
+      "summary": "SDL governance review: blocked on uncommitted worktree changes, incomplete touched_paths, and cross-contaminating untracked files. Fixed by committing remaining changes, updating the lifecycle record, and removing registry/lifecycle/council-repo-setup.json and registry/telemetry/. Commit trailers verified on all commits.",
+      "date": "2026-07-08"
+    }
+  ],
   "audit_hash": ""
 }
