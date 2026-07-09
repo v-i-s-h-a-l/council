@@ -82,6 +82,10 @@ public actor ModelContainerPool {
 
     /// Borrows an available worker, loading one lazily if needed.
     ///
+    /// Verification of downloaded artifacts happens only when a worker is first
+    /// loaded, not on every borrow, so repeated borrows during a deliberation
+    /// do not re-hash multi-gigabyte model files.
+    ///
     /// - Throws: `DeliberationError.thermalCritical` if the thermal state is
     ///   `.critical`, `ModelContainerPoolError.poolExhausted` if all workers
     ///   are busy, or `ModelContainerPoolError.modelChecksumMismatch` if the
@@ -97,57 +101,57 @@ public actor ModelContainerPool {
             guard !busy.contains(index) else { continue }
 
             if workers[index] == nil {
-                workers[index] = try await loadWorker()
+                let worker = try await loadWorker()
+                if await worker.hasRealContainer() {
+                    try await verify(worker: worker, modelID: modelID)
+                }
+                workers[index] = worker
             }
 
             let worker = workers[index]!
-
-            if await worker.hasRealContainer() {
-                guard let expectedChecksum = await manifestService.checksum(for: modelID) else {
-                    workers[index] = nil
-                    throw ModelContainerPoolError.modelChecksumMissing(id: modelID)
-                }
-
-                let directory = try await worker.modelDirectory()
-                let verifier = ModelArtifactVerifier()
-
-                do {
-                    try verifier.verify(
-                        id: modelID,
-                        at: directory,
-                        expectedChecksum: expectedChecksum
-                    )
-                } catch let error as ModelArtifactVerifierError {
-                    workers[index] = nil
-
-                    switch error {
-                    case .checksumMismatch(_, let expected, let actual):
-                        throw ModelContainerPoolError.modelChecksumMismatch(
-                            id: modelID,
-                            expected: expected,
-                            actual: actual
-                        )
-                    case .missingArtifacts:
-                        throw ModelContainerPoolError.modelChecksumMismatch(
-                            id: modelID,
-                            expected: expectedChecksum,
-                            actual: "sha256:missing artifacts"
-                        )
-                    case .unsupportedChecksumFormat:
-                        throw ModelContainerPoolError.modelChecksumMismatch(
-                            id: modelID,
-                            expected: expectedChecksum,
-                            actual: "sha256:unsupported checksum format"
-                        )
-                    }
-                }
-            }
-
             busy.insert(index)
             return worker
         }
 
         throw ModelContainerPoolError.poolExhausted
+    }
+
+    private func verify(worker: ModelContainerWorker, modelID: String) async throws {
+        guard let expectedChecksum = await manifestService.checksum(for: modelID) else {
+            throw ModelContainerPoolError.modelChecksumMissing(id: modelID)
+        }
+
+        let directory = try await worker.modelDirectory()
+        let verifier = ModelArtifactVerifier()
+
+        do {
+            try verifier.verify(
+                id: modelID,
+                at: directory,
+                expectedChecksum: expectedChecksum
+            )
+        } catch let error as ModelArtifactVerifierError {
+            switch error {
+            case .checksumMismatch(_, let expected, let actual):
+                throw ModelContainerPoolError.modelChecksumMismatch(
+                    id: modelID,
+                    expected: expected,
+                    actual: actual
+                )
+            case .missingArtifacts:
+                throw ModelContainerPoolError.modelChecksumMismatch(
+                    id: modelID,
+                    expected: expectedChecksum,
+                    actual: "sha256:missing artifacts"
+                )
+            case .unsupportedChecksumFormat:
+                throw ModelContainerPoolError.modelChecksumMismatch(
+                    id: modelID,
+                    expected: expectedChecksum,
+                    actual: "sha256:unsupported checksum format"
+                )
+            }
+        }
     }
 
     /// Returns a previously borrowed worker to the pool.

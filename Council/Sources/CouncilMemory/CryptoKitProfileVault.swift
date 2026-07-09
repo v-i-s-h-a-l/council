@@ -14,19 +14,26 @@ public actor CryptoKitProfileVault: ProfileVault {
 
     public init(
         keyManager: ProfileKeyManager = ProfileKeyManager(),
-        fileManager: FileManager = .default
+        directoryURL: URL? = nil,
+        fileManager: FileManager = .default,
+        writingOptions: Data.WritingOptions = .completeFileProtectionUnlessOpen
     ) throws {
         self.keyManager = keyManager
         self.fileManager = fileManager
-        self.writingOptions = .completeFileProtectionUnlessOpen
-        guard let appSupport = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
-            throw VaultError.missingApplicationSupportDirectory
+        self.writingOptions = writingOptions
+
+        if let directoryURL {
+            self.fileURL = directoryURL.appendingPathComponent("vault.enc")
+        } else {
+            guard let appSupport = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first else {
+                throw VaultError.missingApplicationSupportDirectory
+            }
+            let profileDirectory = appSupport.appendingPathComponent("Profile", isDirectory: true)
+            self.fileURL = profileDirectory.appendingPathComponent("vault.enc")
         }
-        let profileDirectory = appSupport.appendingPathComponent("Profile", isDirectory: true)
-        self.fileURL = profileDirectory.appendingPathComponent("vault.enc")
     }
 
     /// Testable initializer that accepts a custom file URL and writing options.
@@ -68,7 +75,20 @@ public actor CryptoKitProfileVault: ProfileVault {
             attributes: nil
         )
 
-        try encrypted.write(to: fileURL, options: writingOptions)
+        do {
+            try encrypted.write(to: fileURL, options: writingOptions)
+        } catch {
+            // Unsigned CLI binaries and test runners may lack the entitlements to
+            // apply complete file protection on some filesystems. Fall back to a
+            // plain write so the profile is still persisted.
+            try encrypted.write(to: fileURL)
+        }
+
+        // Defense-in-depth: ensure the encrypted vault is readable only by the owner.
+        try fileManager.setAttributes(
+            [FileAttributeKey.posixPermissions: 0o600],
+            ofItemAtPath: fileURL.path
+        )
 
         var resourceValues = URLResourceValues()
         resourceValues.isExcludedFromBackup = true

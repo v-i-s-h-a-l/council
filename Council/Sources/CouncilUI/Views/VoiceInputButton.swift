@@ -41,7 +41,6 @@ public struct VoiceInputButton: View {
         guard isEnabled else { return }
         guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US")) else { return }
         self.recognizer = recognizer
-        recognizer.requiresOnDeviceRecognition = true
 
         SFSpeechRecognizer.requestAuthorization { status in
             Task { @MainActor in

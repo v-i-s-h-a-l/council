@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#
+# Client pre-commit hook for SDL governance.
+# Blocks un-routed file changes and enforces SDL commit trailers.
+
+set -euo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+python3 "$REPO_ROOT/.stibdedlom/bin/validate-commit.py" \
+    --repo-root "$REPO_ROOT" \
+    --staged \

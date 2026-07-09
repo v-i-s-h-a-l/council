@@ -63,6 +63,21 @@ public actor ModelManifestService {
         manifests[id]?.signature
     }
 
+    /// Returns the full manifest for a model identifier, if any.
+    public func manifest(id: String) -> ModelManifest? {
+        manifests[id]
+    }
+
+    /// Returns all registered manifests.
+    public func allManifests() -> [ModelManifest] {
+        Array(manifests.values)
+    }
+
+    /// Removes a manifest from the registry.
+    public func unregister(id: String) {
+        manifests.removeValue(forKey: id)
+    }
+
     /// Validates a candidate checksum against the registered manifest.
     public func validateChecksum(id: String, against value: String) -> Bool {
         checksum(for: id) == value

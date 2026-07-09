@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.3.0",
+  "id": "1caffbbf-a9b1-42dd-bb5b-14b94f43c675",
+  "task_ref": "issues/1",
+  "branch": "sdl/council-swift-implementation",
+  "actor": "Kimi Code CLI",
+  "revision": 4,
+  "created_event": "sdl-govern-this",
+  "classification": "execution",
+  "tier": 2,
+  "preflight": {
+    "touched_paths": [
+      "Council/",
+      "CouncilApp/",
+      "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+      "README.md",
+      "docs/PLAN.md"
+    ],
+    "required_reviewers": [
+      "sibling-agent"
+    ],
+    "adr_required": true,
+    "flags": []
+  },
+  "status": "closed",
+  "workspace": {
+    "path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
+    "branch": "sdl/council-swift-implementation",
+    "is_main_worktree": false
+  },
+  "links": {
+    "issue": "https://github.com/v-i-s-h-a-l/council/issues/1",
+    "pull_request": "https://github.com/v-i-s-h-a-l/council/pull/2",
+    "capability": "capability-implementation-reviewer",
+    "role": "implementation-reviewer",
+    "prior_tag": "v0.1.0-purchase-council",
+    "retrospective_pr_merged": "https://github.com/v-i-s-h-a-l/council/pull/3"
+  },
+  "authority": {
+    "allow_mutation": true,
+    "allowed_paths": [
+      "Council/",
+      "CouncilApp/",
+      "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+      "README.md",
+      "docs/PLAN.md"
+    ],
+    "approval_gate": "User invoked $sdl govern this and provided explicit next-step instructions including code changes, PR, and merge.",
+    "branch_or_worktree_isolation": "sdl/council-swift-implementation",
+    "verification_and_rollback_plan": {
+      "verification": "macOS xcodebuild succeeds; iOS Simulator xcodebuild blocked by upstream mlx-swift encuda/Process API (documented); Swift tests pass (60 tests, 18 suites); placeholder checksum replaced with verified HuggingFace LFS SHA-256 digest; artifact hash verification implemented and tested; performance benchmark target added and compiles.",
+      "rollback_plan": "Reset feature branch to tag v0.1.0-purchase-council and force-push if needed; restore renamed files and branch name."
+    },
+    "client_orchestrator_mutation_gate": "Satisfied by explicit $sdl govern this invocation and step-by-step execution request from project owner."
+  },
+  "retrospective_reviews": [
+    {
+      "capability": "capability-implementation-reviewer",
+      "verdict": "needs_revision",
+      "summary": "Retrospective review after merge identified governance gaps: PR #2 merged without GitHub approving review; repo-local lifecycle record missing; verification claim initially inaccurate; commit not produced by capability-commit-author. No critical runtime defects found. Follow-up PR required to add repo-local lifecycle record and correct records.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-commit-author",
+      "verdict": "non-conforming",
+      "summary": "Actual commit bcb4a6f bundled docs, feat, fix, build, and test changes into one feat(implementation) commit. Missing required trailers: Task-Ref, Lifecycle-Record-ID, SDL-Commit-Author. Future commits must be routed through capability-commit-author.",
+      "date": "2026-07-08"
+    },
+    {
+      "capability": "capability-implementation-reviewer",
+      "agent": "agent-5",
+      "verdict": "APPROVE",
+      "summary": "Independent sibling-agent review of PR #3. Verified repo-local lifecycle record matches out-of-band canonical record, summary document accurately reflects SDL retrospective enforcement, and no additional runtime defects were introduced. Approved for merge.",
+      "date": "2026-07-08"
+    }
+  ],
+  "audit_hash": "a69e9983c1b7fdc6051d84d23c78084a040c8523752745d7fffb49bf2c0c704b"
+}

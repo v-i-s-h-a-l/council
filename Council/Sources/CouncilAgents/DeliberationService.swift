@@ -1,4 +1,5 @@
 import CouncilCore
+import CouncilMemory
 import Foundation
 
 /// Public entry point for running a deliberation session.
@@ -13,14 +14,16 @@ public final class DeliberationService: Sendable {
         council: any Council,
         validators: [any PerspectiveValidator],
         context: RoutableProfileContext = RoutableProfileContext(),
-        options: InferenceOptions = InferenceOptions()
+        options: InferenceOptions = InferenceOptions(),
+        memoryService: MemoryService? = nil
     ) {
         self.actor = DeliberationActor(
             provider: provider,
             council: council,
             validators: validators,
             context: context,
-            options: options
+            options: options,
+            memoryService: memoryService
         )
     }
 
@@ -45,6 +48,7 @@ private actor DeliberationActor {
     private let validators: [any PerspectiveValidator]
     private let context: RoutableProfileContext
     private let options: InferenceOptions
+    private let memoryService: MemoryService?
 
     private var state: DeliberationState
     private var stateContinuation: AsyncStream<DeliberationState>.Continuation?
@@ -55,13 +59,15 @@ private actor DeliberationActor {
         council: any Council,
         validators: [any PerspectiveValidator],
         context: RoutableProfileContext,
-        options: InferenceOptions
+        options: InferenceOptions,
+        memoryService: MemoryService? = nil
     ) {
         self.provider = provider
         self.council = council
         self.validators = validators
         self.context = context
         self.options = options
+        self.memoryService = memoryService
         self.state = DeliberationState()
     }
 
@@ -89,10 +95,15 @@ private actor DeliberationActor {
 
     private func runDeliberation(question: String) async {
         do {
+            await appendAudit(
+                category: .sessionStarted,
+                payload: ["question": question]
+            )
             updateState {
                 $0.question = question
                 $0.stage = .firstOpinions
             }
+            await appendAudit(category: .stageTransition, payload: ["stage": "firstOpinions"])
 
             let chair = Self.resolveChair(from: council)
             let nonChairAgents = council.agents.filter { $0.id != chair.id }
@@ -113,11 +124,16 @@ private actor DeliberationActor {
                 for try await output in group {
                     firstOpinions.append(output)
                     updateState { $0.agentOutputs.append(output) }
+                    await appendAudit(
+                        category: .agentCalled,
+                        payload: ["stage": "firstOpinions", "agentID": output.agentID]
+                    )
                 }
             }
 
             // Peer review: each agent reviews all first opinions.
             updateState { $0.stage = .peerReview }
+            await appendAudit(category: .stageTransition, payload: ["stage": "peerReview"])
             var peerReviews: [AgentOutput] = []
             for agent in nonChairAgents {
                 let output = try await callAgent(
@@ -128,10 +144,21 @@ private actor DeliberationActor {
                 )
                 peerReviews.append(output)
                 updateState { $0.agentOutputs.append(output) }
+                await appendAudit(
+                    category: .agentCalled,
+                    payload: ["stage": "peerReview", "agentID": output.agentID]
+                )
             }
 
             // Synthesis + dissent preservation + validation with retry.
             let routeDecision = await provider.routeSnapshot.asRouteDecision()
+            await appendAudit(
+                category: .routeDecision,
+                payload: [
+                    "route": routeDecision.selectedRoute.rawValue,
+                    "model": routeDecision.providerMetadata.modelIdentifier,
+                ]
+            )
             let validatedPerspective = try await runSynthesisLoop(
                 chair: chair,
                 nonChairAgents: nonChairAgents,
@@ -145,17 +172,48 @@ private actor DeliberationActor {
                 $0.stage = .presentation
                 $0.perspective = validatedPerspective
             }
+            await persistResult(question: question, perspective: validatedPerspective)
+            await appendAudit(
+                category: .perspectiveProduced,
+                payload: ["summaryLength": "\(validatedPerspective.summary.count)"]
+            )
             stateContinuation?.finish()
         } catch is CancellationError {
             updateState { $0.stage = .cancelled }
+            await appendAudit(category: .cancellation, payload: [:])
             stateContinuation?.finish()
         } catch {
+            let safeError = Self.sanitizedErrorDescription(error)
             updateState {
                 $0.stage = .failed
-                $0.errorMessage = error.localizedDescription
+                $0.errorMessage = safeError
             }
+            await appendAudit(
+                category: .error,
+                payload: ["category": safeError]
+            )
             stateContinuation?.finish()
         }
+    }
+
+    private static func sanitizedErrorDescription(_ error: Error) -> String {
+        // Avoid recording raw provider error strings that may contain paths,
+        // model identifiers, or other sensitive details. Surface only a stable
+        // category derived from the error type.
+        let typeName = String(describing: type(of: error))
+        if error is CancellationError {
+            return "cancelled"
+        }
+        if typeName.contains("Thermal") {
+            return "thermalLimit"
+        }
+        if typeName.contains("Validation") {
+            return "validationFailed"
+        }
+        if typeName.contains("Inference") || typeName.contains("MLX") || typeName.contains("Model") {
+            return "inferenceFailed"
+        }
+        return "deliberationFailed"
     }
 
     private func runSynthesisLoop(
@@ -296,6 +354,33 @@ private actor DeliberationActor {
             return chair
         }
         return council.agents.last!
+    }
+
+    private func appendAudit(category: AuditCategory, payload: [String: String]) async {
+        guard let memoryService else { return }
+        do {
+            try await memoryService.appendAuditEntry(
+                category: category,
+                sessionID: state.sessionID,
+                payload: payload
+            )
+        } catch {
+            // Audit failures are non-fatal but should not be silently ignored in production.
+            // For Phase 1 we tolerate them to keep deliberation available.
+        }
+    }
+
+    private func persistResult(question: String, perspective: Perspective) async {
+        guard let memoryService else { return }
+        do {
+            try await memoryService.recordEpisode(
+                sessionID: state.sessionID,
+                question: question,
+                perspective: perspective
+            )
+        } catch {
+            // Persistence failures are non-fatal in Phase 1.
+        }
     }
 }
 
