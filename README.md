@@ -36,6 +36,8 @@ See [CONSTITUTION.md](CONSTITUTION.md).
 
 ## Build and run
 
+> **CLI-first:** The `council` command-line tool is the primary artifact. `CouncilApp` is an optional SwiftUI wrapper and receives lower priority.
+
 ### Swift package
 
 ```bash
@@ -84,9 +86,7 @@ open CouncilApp.xcodeproj
 
 Set the destination to **macOS 14+** or **iOS 17+** and build. The project embeds the local `Council` SwiftPM package.
 
-> Note: `xcodebuild` for the generated `CouncilApp.xcodeproj` is currently blocked by an upstream `mlx-swift` issue: the `CudaBuild` package plugin fails validation. `swift build` in `CouncilApp/` works, and the Xcode project can still be opened for editing. Physical-device and App Store builds are expected to work because `CudaBuild` is a host-side plugin dependency.
->
-> **iOS Simulator limitation:** Building for the iOS Simulator is additionally blocked because the upstream `mlx-swift` `encuda` executable target uses the macOS-only `Process` API and is incorrectly compiled for the simulator target. macOS `xcodebuild` succeeds.
+> **iOS Simulator limitation:** `xcodebuild` for the generated `CouncilApp.xcodeproj` is blocked for the iOS Simulator because the upstream `mlx-swift` `encuda` executable target uses the macOS-only `Process` API and is incorrectly compiled for the simulator target. macOS `xcodebuild` succeeds. Physical-device and App Store builds may work because the plugin is host-side. `swift build` in `CouncilApp/` also works.
 
 ## Supported devices
 
