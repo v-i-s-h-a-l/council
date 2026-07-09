@@ -68,11 +68,45 @@ Deliver the first real Swift implementation of the Council runtime for iOS 17 / 
 
 ---
 
-## 3. Verification results
+## 3. Phase 2: Expanded Memory and Profile (in progress)
+
+**Lifecycle record:** `6171148c-c5fd-4d38-bd99-786de23866ac`  
+**Issue:** https://github.com/v-i-s-h-a-l/council/issues/23  
+**Branch:** `feature/phase-2-memory-profile`
+
+### Delivered
+
+- **Structured journal entries** (`JournalEntry`) with id, text, timestamp, tags, and purpose-bound access scope.
+  - `council profile journal add` with `--tag`, `--date`, and `--stdin` for multi-line/scriptable input.
+  - `council profile journal list` with tag filters (AND semantics), date range filters, `--reveal`, and `--limit`.
+  - `council profile journal remove <id>`.
+  - Journal entries default to `[.userInspection]` access scope and are never included in `RoutableProfileContext`.
+- **Agent-native metadata** on values, goals, and boundaries:
+  - Optional `createdAt` and `tags` on all three.
+  - `GoalStatus` enum (`active`, `completed`, `paused`) on goals.
+  - `BoundarySeverity` enum (`low`, `medium`, `high`, `critical`) on boundaries.
+  - CLI options `--tag`, `--status`, and `--severity` added to the existing `add` commands.
+- **Legacy profile migration**: `UserProfile` decoder migrates old `journalExcerpts: ClientConfidentialContainer` to `journalEntries: [JournalEntry]` with `[.userInspection]` scope.
+- **Planning ADRs** for the remaining Phase 2 issues:
+  - `planning/adr-025-sqlcipher-migration.md` — full-database encryption approach for GRDB stores.
+  - `planning/adr-026-purpose-bound-access-control.md` — PBAC policy model and `DeliberationService` integration sketch.
+
+### Verification results (Phase 2)
 
 ```text
 cd Council && swift build      ✅ Build complete, Swift 6
-cd Council && swift test       ✅ 88 tests passed across 20 suites
+cd Council && swift test       ✅ All tests passed across core, agents, inference, memory, integration, UI, and CLI suites
+cd Council && swift run council --help ✅ CLI executable runs and exposes profile journal subcommands
+```
+
+---
+
+## 5. Verification results
+
+```text
+cd Council && swift build      ✅ Build complete, Swift 6
+cd Council && swift test       ✅ 88 tests passed across 20 suites (Phase 1)
+cd Council && swift test       ✅ All tests passed, including Phase 2 journal/metadata coverage
 cd Council && swift run council ✅ CLI executable runs with echo provider
 cd CouncilApp && swift build   ✅ Build complete
 xcodebuild macOS               ✅ Succeeded
@@ -108,7 +142,7 @@ AC16 thresholds (on reference hardware):
 
 ---
 
-## 4. Sibling-agent reviews
+## 6. Sibling-agent reviews
 
 | Phase | Capability | Verdict | Notes |
 |---|---|---|---|
@@ -118,10 +152,11 @@ AC16 thresholds (on reference hardware):
 | Implementation hardening | implementation reviewer | `PASS_WITH_NOTES` | Cleared worker slot; added basename validation; added benchmark guard; streaming hash noted as future optimization. |
 | CLI spec lock | implementation reviewer | `PASS_WITH_NOTES` | Blockers addressed in PR #5. |
 | CLI expansion | memory-router, sentinel-audit, implementation reviewer | `PASS_WITH_NOTES` | Service-layer additions, global options, exit codes, audit privacy, consent reconciliation, filesystem hardening. |
+| Phase 2 plan | implementation reviewer | `CONCERN` → `PASS` | Mechanical refactor inventory, legacy timestamp handling, journal confidentiality, SQLCipher keying, CLI metadata options, and negative test coverage addressed. |
 
 ---
 
-## 5. Known limitations and next steps
+## 7. Known limitations and next steps
 
 - **iOS Simulator `xcodebuild`** — Building `CouncilApp.xcodeproj` for iOS Simulator is blocked by an upstream `mlx-swift` issue: the `encuda` executable target (used by the `CudaBuild` plugin) references the macOS-only `Process` API and is incorrectly compiled for the simulator target. macOS `xcodebuild` succeeds. Physical-device and App Store builds are expected to work because `encuda` is a host-side plugin dependency.
 - **Performance benchmarks** — The `CouncilBenchmarks` target is ready and compiles. Set `COUNCIL_RUN_BENCHMARKS=1` to execute it. Because MLX cannot load its default metallib outside an app bundle, AC16 numbers must be collected on reference hardware (iPhone 12 / 4 GB RAM for iOS, Apple Silicon Mac for macOS).
@@ -131,7 +166,7 @@ AC16 thresholds (on reference hardware):
 
 ---
 
-## 6. How to build and run
+## 8. How to build and run
 
 ```bash
 # Build the SwiftPM package
@@ -145,10 +180,17 @@ swift test
 swift run council ask "Should I buy a used road bike?"
 
 # Manage profile values, goals, and boundaries
-swift run council profile value add "Be frugal"
-swift run council profile goal add "Save for travel" --timeframe 2027
-swift run council profile boundary add "No impulse buys"
+swift run council profile value add "Be frugal" --tag spirituality
+swift run council profile goal add "Save for travel" --timeframe 2027 --status active
+swift run council profile boundary add "No impulse buys" --severity high
 swift run council profile show
+
+# Manage confidential journal entries
+swift run council profile journal add "Feeling reflective today" --tag evening
+echo "Multi-line entry" | swift run council profile journal add --stdin --tag morning
+swift run council profile journal list
+swift run council profile journal list --reveal
+swift run council profile journal remove <entry-id>
 
 # Manage memory
 swift run council memory list
@@ -182,17 +224,19 @@ swift build
 
 ---
 
-## 7. Tags and links
+## 9. Tags and links
 
-- Branch: https://github.com/v-i-s-h-a-l/council/tree/sdl/council-swift-implementation
-- Issue: https://github.com/v-i-s-h-a-l/council/issues/1
-- Pull request: https://github.com/v-i-s-h-a-l/council/pull/21
-- Lifecycle record (repo-local): `registry/lifecycle/council-swift-implementation.json`
-- Lifecycle record (out-of-band): `~/.stibdedlom/records/v-i-s-h-a-l/council/e88b979b-49a9-4c4a-8275-a2f5866faa09.json`
+- Phase 1 branch: https://github.com/v-i-s-h-a-l/council/tree/sdl/council-swift-implementation
+- Phase 1 issue: https://github.com/v-i-s-h-a-l/council/issues/1
+- Phase 1 pull request: https://github.com/v-i-s-h-a-l/council/pull/21
+- Phase 2 branch: https://github.com/v-i-s-h-a-l/council/tree/feature/phase-2-memory-profile
+- Phase 2 issue: https://github.com/v-i-s-h-a-l/council/issues/23
+- Lifecycle record (Phase 1, out-of-band): `~/.stibdedlom/records/v-i-s-h-a-l/council/e88b979b-49a9-4c4a-8275-a2f5866faa09.json`
+- Lifecycle record (Phase 2, out-of-band): `~/.stibdedlom/records/v-i-s-h-a-l/council/6171148c-c5fd-4d38-bd99-786de23866ac.json`
 
 ---
 
-## 8. SDL governance compliance
+## 10. SDL governance compliance
 
 This work was routed through SDL capabilities:
 
