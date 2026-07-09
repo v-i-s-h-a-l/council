@@ -13,10 +13,10 @@ struct PromptLeakageTests {
                 "bank account: 12345",
                 "credit card debt: 5000",
             ]),
-            journalExcerpts: ClientConfidentialContainer(items: [
-                "private dream about flying",
-                "argument with a friend",
-            ])
+            journalEntries: [
+                JournalEntry(text: "private dream about flying"),
+                JournalEntry(text: "argument with a friend"),
+            ]
         )
         let context = RoutableProfileContext(profile: profile)
 
@@ -29,7 +29,7 @@ struct PromptLeakageTests {
         #expect(!json.contains("private dream about flying"))
         #expect(!json.contains("argument with a friend"))
         #expect(!json.contains("financialHistory"))
-        #expect(!json.contains("journalExcerpts"))
+        #expect(!json.contains("journalEntries"))
         #expect(!json.contains("ClientConfidentialContainer"))
     }
 
@@ -39,7 +39,7 @@ struct PromptLeakageTests {
             goals: [Goal(text: "Save for travel")],
             boundaries: [Boundary(text: "No impulse buys")],
             financialHistory: ClientConfidentialContainer(items: ["salary: 100000"]),
-            journalExcerpts: ClientConfidentialContainer(items: ["private dream"])
+            journalEntries: [JournalEntry(text: "private dream")]
         )
         let context = RoutableProfileContext(profile: profile)
 

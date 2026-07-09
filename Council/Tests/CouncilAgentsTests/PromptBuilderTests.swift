@@ -53,7 +53,7 @@ struct PromptBuilderTests {
             goals: [Goal(text: "Save for travel")],
             boundaries: [Boundary(text: "No impulse buys")],
             financialHistory: ClientConfidentialContainer(items: ["salary: 100000", "bank account: 12345"]),
-            journalExcerpts: ClientConfidentialContainer(items: ["private dream"])
+            journalEntries: [JournalEntry(text: "private dream")]
         )
         let context = RoutableProfileContext(profile: profile)
 

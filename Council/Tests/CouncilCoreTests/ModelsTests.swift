@@ -17,7 +17,7 @@ struct ModelsTests {
             goals: [Goal(text: "Save for travel")],
             boundaries: [Boundary(text: "No impulse buys")],
             financialHistory: ClientConfidentialContainer(items: ["salary: 100000"]),
-            journalExcerpts: ClientConfidentialContainer(items: ["dream vacation"])
+            journalEntries: [JournalEntry(text: "dream vacation")]
         )
 
         let context = RoutableProfileContext(profile: profile)

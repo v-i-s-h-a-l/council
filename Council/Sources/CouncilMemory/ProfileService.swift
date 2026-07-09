@@ -29,9 +29,12 @@ public actor ProfileService {
     // MARK: - Value management
 
     @discardableResult
-    public func addValue(_ text: String) async throws -> ValueStatement {
+    public func addValue(
+        _ text: String,
+        tags: [String] = []
+    ) async throws -> ValueStatement {
         var profile = try await load()
-        let statement = ValueStatement(text: text)
+        let statement = ValueStatement(text: text, tags: tags)
         profile.values.append(statement)
         try await save(profile)
         return statement
@@ -46,9 +49,14 @@ public actor ProfileService {
     // MARK: - Goal management
 
     @discardableResult
-    public func addGoal(_ text: String, timeframe: String? = nil) async throws -> Goal {
+    public func addGoal(
+        _ text: String,
+        timeframe: String? = nil,
+        tags: [String] = [],
+        status: GoalStatus? = nil
+    ) async throws -> Goal {
         var profile = try await load()
-        let goal = Goal(text: text, timeframe: timeframe)
+        let goal = Goal(text: text, timeframe: timeframe, tags: tags, status: status)
         profile.goals.append(goal)
         try await save(profile)
         return goal
@@ -63,9 +71,13 @@ public actor ProfileService {
     // MARK: - Boundary management
 
     @discardableResult
-    public func addBoundary(_ text: String) async throws -> Boundary {
+    public func addBoundary(
+        _ text: String,
+        tags: [String] = [],
+        severity: BoundarySeverity? = nil
+    ) async throws -> Boundary {
         var profile = try await load()
-        let boundary = Boundary(text: text)
+        let boundary = Boundary(text: text, tags: tags, severity: severity)
         profile.boundaries.append(boundary)
         try await save(profile)
         return boundary
@@ -75,5 +87,50 @@ public actor ProfileService {
         var profile = try await load()
         profile.boundaries.removeAll { $0.id == id }
         try await save(profile)
+    }
+
+    // MARK: - Journal management
+
+    @discardableResult
+    public func addJournalEntry(
+        _ text: String,
+        createdAt: Date = Date(),
+        tags: [String] = []
+    ) async throws -> JournalEntry {
+        var profile = try await load()
+        let entry = JournalEntry(text: text, createdAt: createdAt, tags: tags)
+        profile.journalEntries.append(entry)
+        try await save(profile)
+        return entry
+    }
+
+    public func removeJournalEntry(id: UUID) async throws {
+        var profile = try await load()
+        profile.journalEntries.removeAll { $0.id == id }
+        try await save(profile)
+    }
+
+    public func journalEntries(
+        tags: [String] = [],
+        from: Date? = nil,
+        to: Date? = nil
+    ) async throws -> [JournalEntry] {
+        let profile = try await load()
+        return profile.journalEntries.filter { entry in
+            if !tags.isEmpty {
+                let entryTags = Set(entry.tags)
+                let requiredTags = Set(tags)
+                if !requiredTags.isSubset(of: entryTags) {
+                    return false
+                }
+            }
+            if let from, entry.createdAt < from {
+                return false
+            }
+            if let to, entry.createdAt > to {
+                return false
+            }
+            return true
+        }
     }
 }

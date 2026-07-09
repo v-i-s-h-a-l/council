@@ -105,6 +105,33 @@ struct CLIIntegrationTests {
         #expect(profile.boundaries.isEmpty)
     }
 
+    @Test("Journal management through RuntimeAssembly")
+    func journalManagement() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let assembly = try await RuntimeAssembly(
+            rootDirectory: root,
+            useSecureEnclave: false
+        )
+
+        let entry = try await assembly.profileService.addJournalEntry(
+            "Reflection",
+            tags: ["evening"]
+        )
+        var profile = try await assembly.profileService.load()
+        #expect(profile.journalEntries.count == 1)
+        #expect(profile.journalEntries.first?.text == "Reflection")
+
+        let filtered = try await assembly.profileService.journalEntries(tags: ["evening"])
+        #expect(filtered.count == 1)
+        #expect(filtered.first?.id == entry.id)
+
+        try await assembly.profileService.removeJournalEntry(id: entry.id)
+        profile = try await assembly.profileService.load()
+        #expect(profile.journalEntries.isEmpty)
+    }
+
     @Test("Memory management through RuntimeAssembly")
     func memoryManagement() async throws {
         let root = FileManager.default.temporaryDirectory
@@ -188,10 +215,10 @@ struct CLIIntegrationTests {
         let profile = UserProfile(
             values: [ValueStatement(text: "Value")],
             financialHistory: ClientConfidentialContainer(items: ["salary"]),
-            journalExcerpts: ClientConfidentialContainer(items: ["diary"])
+            journalEntries: [JournalEntry(text: "diary")]
         )
         let context = RoutableProfileContext(profile: profile)
         #expect(context.values.count == 1)
-        // RoutableProfileContext intentionally omits financialHistory and journalExcerpts.
+        // RoutableProfileContext intentionally omits financialHistory and journalEntries.
     }
 }

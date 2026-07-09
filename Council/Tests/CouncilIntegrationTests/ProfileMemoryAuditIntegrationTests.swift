@@ -55,7 +55,7 @@ struct ProfileMemoryAuditIntegrationTests {
             goals: [Goal(text: "Save for a house")],
             boundaries: [Boundary(text: "No high-interest debt")],
             financialHistory: ClientConfidentialContainer(items: ["secret account: 99999"]),
-            journalExcerpts: ClientConfidentialContainer(items: ["secret thought"])
+            journalEntries: [JournalEntry(text: "secret thought")]
         )
         try await root.profileService.save(profile)
 
@@ -106,7 +106,7 @@ struct ProfileMemoryAuditIntegrationTests {
         let profile = UserProfile(
             values: [ValueStatement(text: "Privacy")],
             financialHistory: ClientConfidentialContainer(items: ["salary: 1000000"]),
-            journalExcerpts: ClientConfidentialContainer(items: ["private journal entry"])
+            journalEntries: [JournalEntry(text: "private journal entry")]
         )
         try await root.profileService.save(profile)
 
