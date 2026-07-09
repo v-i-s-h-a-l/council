@@ -9,6 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../Council"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.9.0"),
     ],
     targets: [
         .executableTarget(
@@ -19,6 +20,7 @@ let package = Package(
                 .product(name: "CouncilAgents", package: "Council"),
                 .product(name: "CouncilMemory", package: "Council"),
                 .product(name: "CouncilInference", package: "Council"),
+                .product(name: "GRDB", package: "GRDB.swift"),
             ],
             path: "Sources/CouncilApp",
             swiftSettings: [

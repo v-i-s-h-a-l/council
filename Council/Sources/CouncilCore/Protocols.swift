@@ -24,7 +24,6 @@ public protocol ProfileVault: Sendable {
 public extension ProfileVault {
     var isDeviceBound: Bool { get async { false } }
 }
-
 // MARK: - Memory
 
 public struct MemoryFilter: Sendable {

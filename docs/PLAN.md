@@ -56,7 +56,6 @@ COUNCIL_RUN_BENCHMARKS=1 swift test --filter CouncilBenchmarks
 > Note: MLX Metal inference requires a physical device or macOS host. The benchmark target skips automatically in the iOS Simulator and when `COUNCIL_RUN_BENCHMARKS` is unset.
 
 ## Phase 2: Expanded Memory and Profile
-
 - Expand profile ingestion: values, goals, boundaries, and basic journal ingestion.
 - SQLCipher full-database encryption.
 - Refine purpose-bound access control for richer profile data.
