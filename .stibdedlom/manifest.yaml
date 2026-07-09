@@ -12,10 +12,10 @@ lifecycle_retention:
   completed_chain_records_days: 90
   max_records_per_chain: 50
   compaction_enabled: true
-infra_commit_ref: "851d5a738a8c6f02e890106bef608add218e7197"
+infra_commit_ref: "b587bb18a43c0279d2524805f0a751a2ddbd5bf8"
 onboarded_template_version: "1"
-onboarded_at: "2026-07-09T09:14:23.268182+00:00"
-registered_at: "2026-07-09T09:14:23.268182+00:00"
+onboarded_at: "2026-07-09T12:14:46.206213+00:00"
+registered_at: "2026-07-09T12:14:46.206213+00:00"
 schema_versions:
   client_project_manifest: "stibdedlom-client-manifest@2"
   invocation_policy: "0.1.0"
