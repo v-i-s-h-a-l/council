@@ -234,10 +234,19 @@ struct CouncilBenchmarks {
         return
         #endif
 
-        guard ProcessInfo.processInfo.environment["COUNCIL_RUN_BENCHMARKS"] == "1" else {
+        let runBenchmarks = ProcessInfo.processInfo.environment["COUNCIL_RUN_BENCHMARKS"]
+        if runBenchmarks == "0" {
+            print("SKIP: COUNCIL_RUN_BENCHMARKS=0 disables on-device performance benchmarks")
+            return
+        }
+        #if os(macOS)
+        // On macOS the benchmark runs by default so CI can collect AC16 numbers.
+        #else
+        guard runBenchmarks == "1" else {
             print("SKIP: Set COUNCIL_RUN_BENCHMARKS=1 to run on-device performance benchmarks")
             return
         }
+        #endif
 
         let configuration = BenchmarkConfiguration()
         let thresholds = AC16Thresholds.current
