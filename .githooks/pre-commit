@@ -10,4 +10,3 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 python3 "$REPO_ROOT/.stibdedlom/bin/validate-commit.py" \
     --repo-root "$REPO_ROOT" \
     --staged \
-    --commit-msg-file "$1"
