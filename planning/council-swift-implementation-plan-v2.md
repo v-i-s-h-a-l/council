@@ -3,9 +3,11 @@
 **Status:** Locked for implementation  
 **Scope:** Purchase Council v1 on iOS 17 / macOS 14 / iPadOS 17 / visionOS 1  
 **Date:** 2026-07-07  
-**Authority:** Locked PRD `council-swift-migration-prd-v2.1.md`, locked architecture `council-swift-migration-architecture-v2.1.md`  
+**Authority:** Locked PRD `council-swift-implementation-prd-v2.1.md`, locked architecture `council-swift-implementation-architecture-v2.1.md`  
 **Branch:** `sdl/council-swift-migration`  
 **SDL lifecycle record:** `council-swift-migration`
+
+> **Historical note:** This document was renamed from `council-swift-migration-implementation-plan-v2.md` to `council-swift-implementation-plan-v2.md` after the project retired the "migration" framing in favor of "implementation" naming. The original SDL lifecycle record and branch names referenced inside the document are preserved as historical artifacts.
 
 ---
 
