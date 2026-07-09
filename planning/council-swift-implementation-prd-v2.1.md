@@ -8,6 +8,8 @@
 **Branch:** `sdl/council-swift-migration`  
 **Authority:** User provided explicit autonomous authority to proceed through full SDL lifecycle without per-step human gating.
 
+> **Historical note:** This document was renamed from `council-swift-migration-prd-v2.1.md` to `council-swift-implementation-prd-v2.1.md` after the project retired the "migration" framing in favor of "implementation" naming. The original SDL lifecycle record and branch names referenced inside the document are preserved as historical artifacts.
+
 ---
 
 ## 1. Objective and scope
@@ -269,7 +271,7 @@ This boundary is documented in the app’s About screen and in the PRD so users 
   - `capability-apple-model-routing-policy`
   - `capability-apple-data-classification`
   - `capability-apple-source-grounding`
-- SDL lifecycle record: `/Users/vishalsingh/.stibdedlom/project-memory/v-i-s-h-a-l/council/lifecycle/council-swift-migration.json`
+- SDL lifecycle record: `1caffbbf-a9b1-42dd-bb5b-14b94f43c675.json` (originally `council-swift-migration.json`)
 - Source-grounded Apple references (retrieved 2026-07-07):
   - [mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm)
   - [mlx-swift](https://github.com/ml-explore/mlx-swift)

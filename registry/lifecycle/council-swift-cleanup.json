@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.3.0",
+  "id": "ddf27c47-2faf-41e0-91ea-7389b3a7d086",
+  "task_ref": "council-swift-cleanup",
+  "branch": "sdl/council-swift-cleanup",
+  "actor": "Kimi Code CLI",
+  "revision": 1,
+  "created_event": "sdl-govern-swift-cleanup",
+  "classification": "execution",
+  "tier": 1,
+  "preflight": {
+    "touched_paths": [
+      "planning/council-swift-implementation-prd-v2.1.md",
+      "planning/council-swift-implementation-architecture-v2.1.md",
+      "planning/council-swift-implementation-plan-v2.md",
+      "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+      "registry/lifecycle/council-swift-cleanup.json"
+    ],
+    "required_reviewers": [
+      "sibling-agent"
+    ],
+    "adr_required": false,
+    "flags": []
+  },
+  "status": "active",
+  "workspace": {
+    "path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
+    "branch": "sdl/council-swift-cleanup",
+    "is_main_worktree": true
+  },
+  "links": {
+    "issue": "https://github.com/v-i-s-h-a-l/council/issues/1",
+    "prior_record": "https://github.com/v-i-s-h-a-l/council/pull/10"
+  },
+  "authority": {
+    "allow_mutation": true,
+    "allowed_paths": [
+      "planning/council-swift-implementation-prd-v2.1.md",
+      "planning/council-swift-implementation-architecture-v2.1.md",
+      "planning/council-swift-implementation-plan-v2.md",
+      "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+      "registry/lifecycle/council-swift-cleanup.json"
+    ],
+    "approval_gate": "User's original 7-step plan included dropping the 'migration' framing; branches and tags are already clean, leaving only historical planning-doc filenames and references.",
+    "branch_or_worktree_isolation": "sdl/council-swift-cleanup",
+    "verification_and_rollback_plan": {
+      "verification": "swift build and swift test still pass; no files named council-swift-migration-* remain in planning/; active references in renamed docs point to the new implementation filenames and record 1caffbbf-a9b1-42dd-bb5b-14b94f43c675; historical branch/record names are preserved as artifacts inside the locked docs.",
+      "rollback_plan": "git revert the cleanup commit or restore the original filenames."
+    },
+    "client_orchestrator_mutation_gate": "Satisfied by explicit user instruction and authority envelope in this lifecycle record."
+  },
+  "retrospective_reviews": [],
+  "audit_hash": ""
+}

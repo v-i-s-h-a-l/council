@@ -4,8 +4,10 @@
 **Date:** 2026-07-07  
 **Governance:** SDL-governed client work  
 **Scope:** Swift 6, SwiftUI, Apple platforms (iOS 17 / macOS 14 / iPadOS 17 / visionOS 1+)  
-**Authority:** Locked PRD `council-swift-migration-prd-v2.1.md`  
+**Authority:** Locked PRD `council-swift-implementation-prd-v2.1.md`  
 **Revisions:** v2.1 incorporates sibling-agent review feedback from the PRD v1/v2 review and the architecture v1 review.
+
+> **Historical note:** This document was renamed from `council-swift-migration-architecture-v2.1.md` to `council-swift-implementation-architecture-v2.1.md` after the project retired the "migration" framing in favor of "implementation" naming.
 
 ---
 
@@ -1192,11 +1194,11 @@ The following order is recommended for the first engineering sprint:
 
 ## 16. References
 
-- Locked PRD: `council-swift-migration-prd-v2.1.md`
+- Locked PRD: `council-swift-implementation-prd-v2.1.md`
 - Council Constitution: `CONSTITUTION.md`
 - Existing architecture: `docs/ARCHITECTURE.md`
 - Plan: `docs/PLAN.md`
-- SDL lifecycle record: `council-swift-migration.json`
+- SDL lifecycle record: `1caffbbf-a9b1-42dd-bb5b-14b94f43c675.json` (originally `council-swift-migration.json`)
 - Source-grounded Apple references listed in PRD §11.
 
 ---
