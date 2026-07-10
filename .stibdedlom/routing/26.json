@@ -1,0 +1,36 @@
+{
+  "schema_version": "sdl-routing-attestation@2",
+  "issue": 26,
+  "chain_id": "purpose-bound-access-control",
+  "node_id": "1d45fdf1-52b1-4148-9077-e41efda34060",
+  "goal": "CLI: purpose-bound access control for profile and memory data",
+  "capability": "capability-apple-platform-security",
+  "allowed_paths": [
+    "Council/Sources",
+    "Council/Tests",
+    "planning",
+    "docs",
+    "registry/lifecycle",
+    "registry/telemetry",
+    ".stibdedlom/routing",
+    ".stibdedlom/reviews",
+    ".stibdedlom/issue-chains"
+  ],
+  "policy_ref": ".stibdedlom/invocation-policy.yaml",
+  "manifest_path": ".stibdedlom/manifest.yaml",
+  "created_at": "2026-07-10T09:22:18.758917+00:00",
+  "expires_at": "2026-07-17T09:22:18.758917+00:00",
+  "runtime_binding": {
+    "branch": "feature/purpose-bound-access-control",
+    "worktree_path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
+    "base_sha": "5c90b2e25aaacf237f6818851deddebf25f1d9bf",
+    "base_ref": "main",
+    "max_commits_ahead": 50
+  },
+  "lifecycle_record_id": "fbefa0e8-b352-4c85-a6be-db8876d38c6f",
+  "max_commits_ahead": 50,
+  "algorithm": "hmac-sha256",
+  "kid": "legacy-hmac",
+  "envelope_hash": "sha256:7b63f5fde905be9e9f6ce06923aae87e3758af5d7e2ddf6df9c17fa56a3b547a",
+  "signature": "hmac-sha256:5db7f80b1e40e01e9655728078f4d7777222610db75fe50ab508a86a08f62196"
+}
