@@ -49,8 +49,8 @@ EXEMPT_PATTERNS = [
 
 PROTECTED_BRANCHES = ["main", "master", "release/*"]
 
-ROUTING_ATTESTATION_SCHEMA_VERSION = "sdl-routing-attestation@1"
-CLIENT_MANIFEST_SCHEMA_VERSION = "stibdedlom-client-manifest@1"
+ROUTING_ATTESTATION_SCHEMA_VERSION = "sdl-routing-attestation@2"
+CLIENT_MANIFEST_SCHEMA_VERSION = "stibdedlom-client-manifest@2"
 INVOCATION_POLICY_SCHEMA_VERSION = "0.1.0"
 
 
@@ -201,14 +201,12 @@ def load_routing_attestation_key(repo_root: Path) -> tuple[bytes | None, list[st
 
     manifest = load_manifest(repo_root)
     if manifest and manifest.get("memory_root"):
-        key_path = (
-            Path(manifest["memory_root"]).expanduser().resolve()
-            / ".stibdedlom"
-            / "trust"
-            / "routing-attestation.key"
-        )
-        if key_path.exists():
-            return key_path.read_bytes(), []
+        trust_dir = Path(manifest["memory_root"]).expanduser().resolve() / ".stibdedlom" / "trust"
+        # Prefer the canonical Phase-5 name; fall back to the legacy name.
+        for name in ("routing-attestation.hmac.key", "routing-attestation.key"):
+            key_path = trust_dir / name
+            if key_path.exists():
+                return key_path.read_bytes(), []
 
     return None, ["sdl.hook.signature_skipped"]
 
@@ -450,7 +448,9 @@ def _read_commit_message(
         return commit_msg_file.read_text(encoding="utf-8")
     if commit_sha:
         return _run_git(repo_root, "log", "-1", "--format=%B", commit_sha).stdout
-    return ""
+    # Default to the current HEAD message so pre-commit hooks can resolve the
+    # parent commit's attestation even when no explicit message source is given.
+    return _run_git(repo_root, "log", "-1", "--format=%B").stdout
 
 
 def _commit_author_timestamp(repo_root: Path, sha: str) -> int:
@@ -682,6 +682,8 @@ def validate_push(
     if manifest and manifest.get("memory_root"):
         memory_root = Path(manifest["memory_root"]).expanduser().resolve()
 
+    key, key_reason_codes = load_routing_attestation_key(repo_root)
+
     failures: list[dict[str, Any]] = []
     for sha in rev_list:
         files = list_changed_files(repo_root, commit_sha=sha)
@@ -780,7 +782,7 @@ def validate_push(
                     ok = False
                     break
             if attestation.get("signature") and not verify_attestation_signature(
-                attestation, repo_root=repo_root
+                attestation, key=key, repo_root=repo_root
             ):
                 failures.append(
                     {
@@ -887,10 +889,14 @@ def validate_push(
             "failures": failures,
         }
 
+    reason_codes = ["sdl.hook.validated"]
+    for code in key_reason_codes:
+        if code not in reason_codes:
+            reason_codes.append(code)
     return {
         "ok": True,
         "reason": "push validated",
-        "reason_codes": ["sdl.hook.validated"],
+        "reason_codes": reason_codes,
         "commit_count": len(rev_list),
     }
 

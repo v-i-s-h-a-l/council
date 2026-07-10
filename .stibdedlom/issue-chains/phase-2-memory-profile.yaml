@@ -1,0 +1,82 @@
+schema_version: sdl-issue-chain@2
+kind: sdl-issue-chain
+project_ref: project://v-i-s-h-a-l/council
+source_issue: 23
+base_ref: main
+base_sha: ea02cc653a3bac247cb8e3b382252c7be38fe814
+invocation_policy_ref: .stibdedlom/invocation-policy.yaml
+autonomy_default: approval-required
+version: 1
+etag: sha256:afbf9d0f3560b0fd7795e81c42a0a79ee6b6fc67e064f77826aee642cad28d91
+issues:
+- number: 23
+  title: 'Phase 2: Expanded Memory and Profile (CLI-first)'
+  capability: capability-apple-native-development
+  intent_class: execution
+  allowed_paths:
+  - Council/Sources
+  - Council/Tests
+  - planning
+  - docs
+  - registry/lifecycle
+  - registry/telemetry
+  - README.md
+  - COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md
+  authority:
+    approval_gate: user-instruction
+    verification: swift build in Council/; swift test in Council/; swift run council
+      --help and relevant subcommands; no regression in existing tests; no modifications
+      to CouncilApp except critical fixes.
+    rollback_plan: 'delete feature/phase-2-memory-profile branch and discard unmerged
+      changes; reopen issue #23 if statuses were updated.'
+  depends_on: []
+  envelope_hash: sha256:bbb5df960621a341c74199107164317ba6ce5bfc94d150de4877c69504a6a923
+  lifecycle_record_id: 0f6e40f2-4399-4725-ac18-4f76d0d1c556
+  kid: legacy-hmac
+  algorithm: hmac-sha256
+  runtime_binding:
+    branch: feature/phase-2-memory-profile
+    worktree_path: /Users/vishalsingh/Documents/v-i-s-h-a-l/github/council
+    base_sha: ea02cc653a3bac247cb8e3b382252c7be38fe814
+    base_ref: main
+    max_commits_ahead: 50
+- number: 24
+  title: 'CLI: expand profile ingestion (values, goals, boundaries, journal)'
+  capability: capability-apple-native-development
+  intent_class: execution
+  allowed_paths:
+  - Council/Sources
+  - Council/Tests
+  - planning
+  - docs
+  authority:
+    approval_gate: user-instruction
+  depends_on:
+  - 23
+- number: 25
+  title: 'CLI: migrate GRDB stores to SQLCipher full-database encryption'
+  capability: capability-adr-author
+  intent_class: planning
+  allowed_paths:
+  - Council/Sources
+  - Council/Tests
+  - planning
+  - docs
+  authority:
+    approval_gate: user-instruction
+  depends_on:
+  - 23
+- number: 26
+  title: 'CLI: purpose-bound access control for profile and memory data'
+  capability: capability-apple-platform-security
+  intent_class: planning
+  allowed_paths:
+  - Council/Sources
+  - Council/Tests
+  - planning
+  - docs
+  authority:
+    approval_gate: user-instruction
+  depends_on:
+  - 23
+  - 24

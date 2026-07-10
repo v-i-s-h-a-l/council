@@ -33,7 +33,7 @@ struct CryptoKitProfileVaultTests {
             goals: [Goal(text: "Save for travel")],
             boundaries: [Boundary(text: "No impulse buys")],
             financialHistory: ClientConfidentialContainer(items: ["salary: 100000"]),
-            journalExcerpts: ClientConfidentialContainer(items: ["private dream"])
+            journalEntries: [JournalEntry(text: "private dream")]
         )
 
         try await vault.save(profile)
@@ -43,7 +43,7 @@ struct CryptoKitProfileVaultTests {
         #expect(loaded.goals.map(\.text) == ["Save for travel"])
         #expect(loaded.boundaries.map(\.text) == ["No impulse buys"])
         #expect(loaded.financialHistory.items == ["salary: 100000"])
-        #expect(loaded.journalExcerpts.items == ["private dream"])
+        #expect(loaded.journalEntries.map(\.text) == ["private dream"])
     }
 
     @Test func missingVaultReturnsEmptyProfile() async throws {
@@ -55,7 +55,7 @@ struct CryptoKitProfileVaultTests {
         #expect(loaded.goals.isEmpty)
         #expect(loaded.boundaries.isEmpty)
         #expect(loaded.financialHistory.items.isEmpty)
-        #expect(loaded.journalExcerpts.items.isEmpty)
+        #expect(loaded.journalEntries.isEmpty)
     }
 
     @Test func exportAndReplaceEncryptedBlob() async throws {

@@ -1,0 +1,53 @@
+event_id: ci-3dafb6a0-812d-46af-8e2b-f0190cef25a8
+event_type: capability_invocation
+timestamp: '2026-07-09T20:46:14Z'
+capability_id: capability-apple-native-development
+task_ref: phase-2-memory-profile
+source:
+  repo_kind: client
+  project_id: v-i-s-h-a-l/council
+  branch: main
+  actor: vishalsingh
+goal: 'Implement Phase 2 Expanded Memory and Profile for the Council Swift CLI: expand
+  council profile subcommands to ingest values, goals, boundaries, and journal entries,
+  persist them through ProfileService/CryptoKitProfileVault, render them in council
+  profile show, add CouncilCLITests, and prepare SQLCipher migration and purpose-bound
+  access control groundwork for issues #25 and #26.'
+intent: execution
+mode: authority-required
+authority:
+  allow_mutation: true
+  allowed_paths:
+  - Council/Sources
+  - Council/Tests
+  - planning
+  - docs
+  - registry/lifecycle
+  - registry/telemetry
+  - README.md
+  - COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md
+  approval_gate: 'user-instruction: Council Swift Next Session Prompt'
+  branch_or_worktree_isolation: feature/phase-2-memory-profile
+  verification_and_rollback_plan:
+    verification: swift build && swift test && swift run council --help
+    rollback_plan: delete feature/phase-2-memory-profile branch and discard unmerged
+      changes
+context:
+  confidence: medium
+  reason: capability-apple-native-development available for discovery/planning, but
+    mutation was requested and no authority envelope was supplied.
+  primary_capability: capability-apple-native-development
+  selected_role: null
+outcome:
+  status: blocked
+  selected_capability: capability-apple-native-development
+  selected_role: null
+performance:
+  elapsed_ms: 19971
+  token_actuals: null
+  budget_actuals: null
+downstream:
+  human_override: false
+  accepted: false
+  failed_runs: 1
+  lifecycle_record_created: false
