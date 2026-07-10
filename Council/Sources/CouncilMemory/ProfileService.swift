@@ -133,4 +133,18 @@ public actor ProfileService {
             return true
         }
     }
+
+    // MARK: - Purpose-bound context
+
+    /// Returns the profile context that is safe to route to agents for the given purposes.
+    ///
+    /// Values, goals, and boundaries are inherently routable profile facts and are returned in
+    /// full. Journal entries and financial history are confidential and are NEVER included,
+    /// regardless of purpose; this is enforced by the shape of `RoutableProfileContext` itself.
+    /// The `purposes` parameter is the explicit PBAC choke point for future per-purpose
+    /// filtering and is recorded by callers as an access decision.
+    public func routableContext(purposes: [AccessPurpose]) async throws -> RoutableProfileContext {
+        let profile = try await load()
+        return RoutableProfileContext(profile: profile)
+    }
 }

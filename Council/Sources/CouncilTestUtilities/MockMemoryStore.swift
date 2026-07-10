@@ -53,6 +53,7 @@ public actor MockMemoryStore: MemoryStore {
                 let purposeSet = Set(purposes)
                 let scopeSet = Set(fact.accessScope)
                 guard !purposeSet.isDisjoint(with: scopeSet) else { return false }
+                guard purposeSet.isDisjoint(with: Set(fact.deniedPurposes)) else { return false }
             }
             if let locked = filter.locked, locked != fact.isLocked { return false }
             if let subject = filter.subject, fact.subject != subject { return false }

@@ -42,6 +42,7 @@ struct TemporalFactRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var validFrom: Date?
     var validUntil: Date?
     var accessScopeJSON: String
+    var deniedPurposesJSON: String
     var isLocked: Bool
 
     // Encrypted JSON blob.
@@ -54,6 +55,7 @@ struct TemporalFactRecord: Codable, FetchableRecord, MutablePersistableRecord {
         static let validFrom = Column("validFrom")
         static let validUntil = Column("validUntil")
         static let accessScopeJSON = Column("accessScopeJSON")
+        static let deniedPurposesJSON = Column("deniedPurposesJSON")
         static let isLocked = Column("isLocked")
         static let objectEncrypted = Column("objectEncrypted")
     }

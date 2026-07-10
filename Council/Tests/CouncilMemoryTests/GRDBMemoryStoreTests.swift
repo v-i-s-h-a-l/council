@@ -128,6 +128,32 @@ struct GRDBMemoryStoreTests {
         #expect(travelFacts.first?.object == "Japan trip")
     }
 
+    @Test func temporalFactsDeniedByPurpose() async throws {
+        let store = try makeStore()
+        let sensitive = TemporalFact(
+            subject: "user",
+            predicate: "ssn",
+            object: "123-45-6789",
+            accessScope: [.purchaseDeliberation, .travelDeliberation],
+            deniedPurposes: [.purchaseDeliberation]
+        )
+        try await store.saveFact(sensitive)
+
+        // Denied for purchase even though purchase is in accessScope.
+        let purchase = try await store.temporalFacts(for: .purchaseDeliberation)
+        #expect(purchase.isEmpty)
+
+        let purchaseViaFilter = try await store.temporalFacts(
+            matching: MemoryFilter(purposes: [.purchaseDeliberation])
+        )
+        #expect(purchaseViaFilter.isEmpty)
+
+        // Still allowed for travel (in scope, not denied), and deniedPurposes round-trips.
+        let travel = try await store.temporalFacts(for: .travelDeliberation)
+        #expect(travel.count == 1)
+        #expect(travel.first?.deniedPurposes == [.purchaseDeliberation])
+    }
+
     @Test func lockedFactsExcludedFromAgentContext() async throws {
         let store = try makeStore()
         let unlockedFact = TemporalFact(

@@ -107,6 +107,15 @@ private actor DeliberationActor {
 
             let chair = Self.resolveChair(from: council)
             let nonChairAgents = council.agents.filter { $0.id != chair.id }
+            let purpose = Self.resolvePurpose(from: council)
+            await appendAudit(
+                category: .memoryAccess,
+                payload: [
+                    "purpose": purpose.rawValue,
+                    "dataElementType": "RoutableProfileContext",
+                    "decision": "allowed",
+                ]
+            )
 
             // First opinions: run all non-chair agents concurrently.
             var firstOpinions: [AgentOutput] = []
@@ -344,6 +353,14 @@ private actor DeliberationActor {
     private func updateState(_ transform: (inout DeliberationState) -> Void) {
         transform(&state)
         stateContinuation?.yield(state)
+    }
+
+    private static func resolvePurpose(from council: any Council) -> AccessPurpose {
+        if council is PurchaseCouncil {
+            return .purchaseDeliberation
+        }
+        // Future councils extend this mapping (e.g. TravelCouncil -> .travelDeliberation).
+        return .purchaseDeliberation
     }
 
     private static func resolveChair(from council: any Council) -> any Agent {

@@ -133,13 +133,17 @@ extension MemoryCommand.FactCommand {
         @Option(help: "Access purpose for the fact.")
         var purpose: AccessPurpose = .purchaseDeliberation
 
+        @Option(name: .long, help: "Purpose explicitly denied for this fact. May be repeated.")
+        var deniedPurpose: [AccessPurpose] = []
+
         func run() async throws {
             let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
             let fact = try await assembly.memoryService.addFact(
                 subject: subject,
                 predicate: predicate,
                 object: object,
-                accessScope: [purpose]
+                accessScope: [purpose],
+                deniedPurposes: deniedPurpose
             )
             switch options.format {
             case .text, .markdown:

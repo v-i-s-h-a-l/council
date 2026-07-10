@@ -349,6 +349,7 @@ public struct TemporalFact: Codable, Sendable, Identifiable {
     public var validFrom: Date?
     public var validUntil: Date?
     public var accessScope: [AccessPurpose]
+    public var deniedPurposes: [AccessPurpose]
     public var isLocked: Bool
 
     public init(
@@ -359,6 +360,7 @@ public struct TemporalFact: Codable, Sendable, Identifiable {
         validFrom: Date? = nil,
         validUntil: Date? = nil,
         accessScope: [AccessPurpose] = [.purchaseDeliberation],
+        deniedPurposes: [AccessPurpose] = [],
         isLocked: Bool = false
     ) {
         self.id = id
@@ -368,7 +370,34 @@ public struct TemporalFact: Codable, Sendable, Identifiable {
         self.validFrom = validFrom
         self.validUntil = validUntil
         self.accessScope = accessScope
+        self.deniedPurposes = deniedPurposes
         self.isLocked = isLocked
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case subject
+        case predicate
+        case object
+        case validFrom
+        case validUntil
+        case accessScope
+        case deniedPurposes
+        case isLocked
+    }
+
+    /// Decodes tolerantly so facts persisted before `deniedPurposes` existed still load.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.subject = try container.decode(String.self, forKey: .subject)
+        self.predicate = try container.decode(String.self, forKey: .predicate)
+        self.object = try container.decode(String.self, forKey: .object)
+        self.validFrom = try container.decodeIfPresent(Date.self, forKey: .validFrom)
+        self.validUntil = try container.decodeIfPresent(Date.self, forKey: .validUntil)
+        self.accessScope = try container.decodeIfPresent([AccessPurpose].self, forKey: .accessScope) ?? [.purchaseDeliberation]
+        self.deniedPurposes = try container.decodeIfPresent([AccessPurpose].self, forKey: .deniedPurposes) ?? []
+        self.isLocked = try container.decodeIfPresent(Bool.self, forKey: .isLocked) ?? false
     }
 }
 

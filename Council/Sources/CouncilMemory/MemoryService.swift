@@ -64,13 +64,15 @@ public actor MemoryService {
         subject: String,
         predicate: String,
         object: String,
-        accessScope: [AccessPurpose] = [.purchaseDeliberation]
+        accessScope: [AccessPurpose] = [.purchaseDeliberation],
+        deniedPurposes: [AccessPurpose] = []
     ) async throws -> TemporalFact {
         let fact = TemporalFact(
             subject: subject,
             predicate: predicate,
             object: object,
-            accessScope: accessScope
+            accessScope: accessScope,
+            deniedPurposes: deniedPurposes
         )
         try await store.saveFact(fact)
         return fact
@@ -78,6 +80,29 @@ public actor MemoryService {
 
     public func facts(subject: String? = nil) async throws -> [TemporalFact] {
         try await store.temporalFacts(matching: MemoryFilter(locked: false, subject: subject))
+    }
+
+    /// Returns unlocked temporal facts authorized for the given purposes.
+    ///
+    /// A fact is authorized when the requested purposes overlap its `accessScope` and
+    /// do not overlap its `deniedPurposes`. When `purposes` is non-empty, a single
+    /// purpose-bound access decision is recorded in the audit log.
+    public func facts(subject: String? = nil, purposes: [AccessPurpose]) async throws -> [TemporalFact] {
+        let filter = MemoryFilter(purposes: purposes, locked: false, subject: subject)
+        let results = try await store.temporalFacts(matching: filter)
+        if !purposes.isEmpty {
+            let purposeNames = purposes.map(\.rawValue).sorted().joined(separator: ",")
+            try? await appendAuditEntry(
+                category: .memoryAccess,
+                payload: [
+                    "purpose": purposeNames,
+                    "dataElementType": "TemporalFact",
+                    "decision": "allowed",
+                    "count": "\(results.count)",
+                ]
+            )
+        }
+        return results
     }
 
     /// Verifies the integrity of the audit chain.

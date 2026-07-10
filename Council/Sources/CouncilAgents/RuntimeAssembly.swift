@@ -147,8 +147,7 @@ public actor RuntimeAssembly {
         options: InferenceOptions = InferenceOptions(),
         persist: Bool = true
     ) async throws -> DeliberationService {
-        let profile = try await profileService.load()
-        let context = RoutableProfileContext(profile: profile)
+        let context = try await profileService.routableContext(purposes: [.purchaseDeliberation])
 
         return DeliberationService(
             provider: provider,
