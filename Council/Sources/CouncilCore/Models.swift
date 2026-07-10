@@ -105,6 +105,22 @@ public struct ValueStatement: Codable, Sendable {
         self.createdAt = createdAt
         self.tags = tags
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case text
+        case createdAt
+        case tags
+    }
+
+    /// Decodes tolerantly so pre-Phase-2 values that omit `tags`/`createdAt` still load.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.text = try container.decode(String.self, forKey: .text)
+        self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+    }
 }
 
 public struct Goal: Codable, Sendable {
@@ -130,6 +146,26 @@ public struct Goal: Codable, Sendable {
         self.tags = tags
         self.status = status
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case text
+        case timeframe
+        case createdAt
+        case tags
+        case status
+    }
+
+    /// Decodes tolerantly so pre-Phase-2 goals that omit `tags`/`createdAt`/`status` still load.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.text = try container.decode(String.self, forKey: .text)
+        self.timeframe = try container.decodeIfPresent(String.self, forKey: .timeframe)
+        self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        self.status = try container.decodeIfPresent(GoalStatus.self, forKey: .status)
+    }
 }
 
 public struct Boundary: Codable, Sendable {
@@ -151,6 +187,24 @@ public struct Boundary: Codable, Sendable {
         self.createdAt = createdAt
         self.tags = tags
         self.severity = severity
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case text
+        case createdAt
+        case tags
+        case severity
+    }
+
+    /// Decodes tolerantly so pre-Phase-2 boundaries that omit `tags`/`createdAt`/`severity` still load.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.text = try container.decode(String.self, forKey: .text)
+        self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        self.severity = try container.decodeIfPresent(BoundarySeverity.self, forKey: .severity)
     }
 }
 

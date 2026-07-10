@@ -368,6 +368,79 @@ struct CouncilCLITests {
         #expect(profile.journalEntries.first?.tags == ["travel"])
     }
 
+    @Test("UserProfile decodes pre-Phase-2 values/goals/boundaries without tags")
+    func legacyProfileEntriesDecodeWithoutTags() throws {
+        // Pre-Phase-2 entries omit `tags` (and createdAt/status/severity). A non-empty
+        // legacy array must still decode instead of aborting the entire profile load.
+        let legacyJSON = """
+        {
+            "values": [
+                { "id": "A0B1C2D3-E4F5-6789-0123-456789ABCDEF", "text": "Be frugal" }
+            ],
+            "goals": [
+                { "id": "A0B1C2D3-E4F5-6789-0123-456789ABCDE0", "text": "Save for travel", "timeframe": "2027" }
+            ],
+            "boundaries": [
+                { "id": "A0B1C2D3-E4F5-6789-0123-456789ABCDE1", "text": "No impulse buys" }
+            ],
+            "financialHistory": { "items": [] }
+        }
+        """
+        let profile = try JSONDecoder().decode(UserProfile.self, from: Data(legacyJSON.utf8))
+        #expect(profile.values.count == 1)
+        #expect(profile.values.first?.text == "Be frugal")
+        #expect(profile.values.first?.tags == [])
+        #expect(profile.goals.count == 1)
+        #expect(profile.goals.first?.timeframe == "2027")
+        #expect(profile.goals.first?.status == nil)
+        #expect(profile.goals.first?.tags == [])
+        #expect(profile.boundaries.count == 1)
+        #expect(profile.boundaries.first?.severity == nil)
+        #expect(profile.boundaries.first?.tags == [])
+    }
+
+    @Test("journal add rejects invalid ISO date")
+    func journalAddRejectsInvalidDate() throws {
+        #expect(throws: (any Error).self) {
+            try parseISODate("not-a-date")
+        }
+        let valid = try parseISODate("2026-07-09T12:00:00Z")
+        #expect(valid.timeIntervalSince1970 == 1783598400)
+    }
+
+    @Test("journal list redacts text unless reveal is set")
+    func journalListRedaction() throws {
+        let secret = "SECRET_DIARY_TEXT_DO_NOT_LEAK"
+        let entry = JournalEntry(
+            id: UUID(uuidString: "A0B1C2D3-E4F5-6789-0123-456789ABCDEF")!,
+            text: secret,
+            createdAt: ISO8601DateFormatter().date(from: "2026-07-09T20:00:00Z")!,
+            tags: ["evening"]
+        )
+
+        // Text mode: redacted by default, revealed with --reveal.
+        let redactedText = formatJournalListText(entries: [entry], reveal: false)
+        #expect(redactedText.contains("(text redacted)"))
+        #expect(!redactedText.contains(secret))
+
+        let revealedText = formatJournalListText(entries: [entry], reveal: true)
+        #expect(revealedText.contains(secret))
+
+        // JSON mode: text is nil (omitted) by default, present with --reveal.
+        let redactedItems = presentJournalListItems(entries: [entry], reveal: false)
+        #expect(redactedItems.count == 1)
+        #expect(redactedItems.first?.text == nil)
+
+        let revealedItems = presentJournalListItems(entries: [entry], reveal: true)
+        #expect(revealedItems.first?.text == secret)
+
+        // Confirm the JSON wire format withholds the key entirely when redacted.
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let redactedJSON = String(data: try encoder.encode(redactedItems), encoding: .utf8) ?? ""
+        #expect(!redactedJSON.contains(secret))
+    }
+
     @Test("MemoryService searches episodes")
     func memoryServiceSearchEpisodes() async throws {
         let store = MockMemoryStore()

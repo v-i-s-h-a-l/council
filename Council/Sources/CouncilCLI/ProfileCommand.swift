@@ -98,7 +98,7 @@ extension ProfileCommand.ValueCommand {
         func run() async throws {
             let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
             let statement = try await assembly.profileService.addValue(text, tags: tag)
-            printOutput(id: statement.id, format: options.format)
+            try printOutput(id: statement.id, format: options.format)
         }
     }
 
@@ -165,7 +165,7 @@ extension ProfileCommand.GoalCommand {
                 tags: tag,
                 status: status
             )
-            printOutput(id: goal.id, format: options.format)
+            try printOutput(id: goal.id, format: options.format)
         }
     }
 
@@ -228,7 +228,7 @@ extension ProfileCommand.BoundaryCommand {
                 tags: tag,
                 severity: severity
             )
-            printOutput(id: boundary.id, format: options.format)
+            try printOutput(id: boundary.id, format: options.format)
         }
     }
 
@@ -311,7 +311,7 @@ extension ProfileCommand.JournalCommand {
                 createdAt: createdAt,
                 tags: tag
             )
-            printOutput(id: entry.id, format: options.format)
+            try printOutput(id: entry.id, format: options.format)
         }
     }
 
@@ -355,27 +355,9 @@ extension ProfileCommand.JournalCommand {
 
             switch options.format {
             case .text, .markdown:
-                var lines: [String] = []
-                if entries.isEmpty {
-                    lines.append("No journal entries.")
-                } else {
-                    for entry in entries {
-                        let tags = entry.tags.isEmpty ? "" : " [\(entry.tags.joined(separator: ", "))]"
-                        let textLine = reveal ? " \(entry.text)" : " (text redacted)"
-                        lines.append("\(entry.createdAt.iso8601) \(entry.id)\(tags)\(textLine)")
-                    }
-                }
-                print(lines.joined(separator: "\n"))
+                print(formatJournalListText(entries: entries, reveal: reveal))
             case .json:
-                let presented = entries.map { entry in
-                    JournalListItem(
-                        id: entry.id,
-                        createdAt: entry.createdAt,
-                        tags: entry.tags,
-                        text: reveal ? entry.text : nil
-                    )
-                }
-                print(try CLIEncoder.json(presented))
+                print(try CLIEncoder.json(presentJournalListItems(entries: entries, reveal: reveal)))
             }
         }
     }
@@ -402,12 +384,12 @@ extension ProfileCommand.JournalCommand {
 // MARK: - Helpers
 
 @available(macOS 14.0, iOS 17.0, *)
-private func printOutput(id: UUID, format: CLIOutputFormat) {
+private func printOutput(id: UUID, format: CLIOutputFormat) throws {
     switch format {
     case .text, .markdown:
         print(id.uuidString)
     case .json:
-        print(try! CLIEncoder.json(["id": id.uuidString]))
+        print(try CLIEncoder.json(["id": id.uuidString]))
     }
 }
 
@@ -422,7 +404,7 @@ private func readStdin() throws -> String {
     return input
 }
 
-private func parseISODate(_ value: String) throws -> Date {
+func parseISODate(_ value: String) throws -> Date {
     guard let date = ISO8601DateFormatter().date(from: value) else {
         throw ValidationError("Invalid date format: expected ISO-8601 (e.g., 2026-07-09T12:00:00Z).")
     }
@@ -434,7 +416,32 @@ private struct ValidationError: LocalizedError {
     init(_ message: String) { self.errorDescription = message }
 }
 
-private struct JournalListItem: Codable, Sendable {
+func presentJournalListItems(entries: [JournalEntry], reveal: Bool) -> [JournalListItem] {
+    entries.map { entry in
+        JournalListItem(
+            id: entry.id,
+            createdAt: entry.createdAt,
+            tags: entry.tags,
+            text: reveal ? entry.text : nil
+        )
+    }
+}
+
+func formatJournalListText(entries: [JournalEntry], reveal: Bool) -> String {
+    var lines: [String] = []
+    if entries.isEmpty {
+        lines.append("No journal entries.")
+    } else {
+        for entry in entries {
+            let tags = entry.tags.isEmpty ? "" : " [\(entry.tags.joined(separator: ", "))]"
+            let textLine = reveal ? " \(entry.text)" : " (text redacted)"
+            lines.append("\(entry.createdAt.iso8601) \(entry.id)\(tags)\(textLine)")
+        }
+    }
+    return lines.joined(separator: "\n")
+}
+
+struct JournalListItem: Codable, Sendable {
     var id: UUID
     var createdAt: Date
     var tags: [String]
