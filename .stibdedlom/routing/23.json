@@ -32,5 +32,7 @@
   },
   "algorithm": "hmac-sha256",
   "kid": "legacy-hmac",
-  "signature": "hmac-sha256:c911b779e68af8f2c114aa3726b0e4cbb736ed33b68676fc8e10dd1368aea89b"
+  "signature": "hmac-sha256:fb29e7c6f85339e7eb8f49f7a0300c4fcb90e0e122522c2bd6f2794cbbba8b4d",
+  "lifecycle_record_id": "0f6e40f2-4399-4725-ac18-4f76d0d1c556",
+  "max_commits_ahead": 50
 }
