@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0.0",
+  "record_id": "0f6e40f2-4399-4725-ac18-4f76d0d1c556",
+  "capability_id": "capability-apple-native-development",
+  "target_lifecycle": "draft",
+  "approver": "capability-implementation-reviewer",
+  "approver_type": "capability",
+  "verdict": "approved",
+  "self_authorization_check": {
+    "status": "passed",
+    "caller_id": "capability-apple-native-development",
+    "callee_id": "capability-implementation-reviewer",
+    "distinct_identity": true,
+    "promotion_authority_override": false,
+    "attestation_uri": ".stibdedlom/routing/23.json",
+    "dispatch_instance_tag": "phase-2-memory-profile-sibling-review"
+  },
+  "tier": 1,
+  "required_reviewers": [
+    "sibling-agent"
+  ],
+  "sibling_review": {
+    "provider": "sibling-agent",
+    "dispatch_instance_tag": "phase-2-memory-profile-sibling-review",
+    "findings": [
+      {
+        "finding_id": "phase2-sr-001",
+        "severity": "important",
+        "rule_ref": "sdl.review.architecture",
+        "affected_ref": "planning/council-cli-expansion-spec.md",
+        "issue": "Plan omitted mechanical refactor inventory for all journalExcerpts call sites.",
+        "remediation": "Added explicit checklist to the plan and verified no call sites were missed."
+      },
+      {
+        "finding_id": "phase2-sr-002",
+        "severity": "important",
+        "rule_ref": "sdl.review.data-model",
+        "affected_ref": "Council/Sources/CouncilCore/ProfileModels.swift",
+        "issue": "Back-dated createdAt: Date would mislead recency reasoning.",
+        "remediation": "Changed to Date? and added GoalStatus/BoundarySeverity enums."
+      },
+      {
+        "finding_id": "phase2-sr-003",
+        "severity": "critical",
+        "rule_ref": "sdl.review.privacy",
+        "affected_ref": "Council/Sources/CouncilCLI/ProfileCommand.swift",
+        "issue": "journal add --purpose conflicted with confidentiality guarantee.",
+        "remediation": "Removed --purpose from journal add; purpose is assigned by reader context, not writer."
+      },
+      {
+        "finding_id": "phase2-sr-004",
+        "severity": "important",
+        "rule_ref": "sdl.review.security",
+        "affected_ref": "docs/adr-sqlcipher-migration.md",
+        "issue": "SQLCipher keying detail missing.",
+        "remediation": "Documented PRAGMA key raw-key mode and rollback procedure."
+      },
+      {
+        "finding_id": "phase2-sr-005",
+        "severity": "info",
+        "rule_ref": "sdl.review.ux",
+        "affected_ref": "Council/Sources/CouncilCLI/ProfileCommand.swift",
+        "issue": "Metadata not editable from CLI and no multi-line input.",
+        "remediation": "Added --tag/--status/--severity options and --stdin support."
+      },
+      {
+        "finding_id": "phase2-sr-006",
+        "severity": "important",
+        "rule_ref": "sdl.review.test-coverage",
+        "affected_ref": "Council/Tests/CouncilCLITests/ProfileCommandTests.swift",
+        "issue": "Negative test coverage missing.",
+        "remediation": "Added invalid-date, redaction, and migration tests."
+      }
+    ]
+  },
+  "timestamp": "2026-07-10T01:08:32.954908+00:00",
+  "audit_hash": "3f0ad0cb2b82dc2e80d574aed1032818cd8bad2277619dc7ace1120e20802c96"
+}

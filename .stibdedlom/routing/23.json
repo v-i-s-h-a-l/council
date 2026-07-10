@@ -1,0 +1,36 @@
+{
+  "schema_version": "sdl-routing-attestation@2",
+  "issue": 23,
+  "chain_id": "phase-2-memory-profile",
+  "node_id": "0f6e40f2-4399-4725-ac18-4f76d0d1c556",
+  "goal": "Phase 2: Expanded Memory and Profile (CLI-first)",
+  "capability": "capability-apple-native-development",
+  "allowed_paths": [
+    "Council/Sources",
+    "Council/Tests",
+    "planning",
+    "docs",
+    "registry/lifecycle",
+    "registry/telemetry",
+    "README.md",
+    "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+    ".stibdedlom/routing",
+    ".stibdedlom/reviews",
+    ".stibdedlom/issue-chains"
+  ],
+  "envelope_hash": "sha256:bbb5df960621a341c74199107164317ba6ce5bfc94d150de4877c69504a6a923",
+  "policy_ref": ".stibdedlom/invocation-policy.yaml",
+  "manifest_path": ".stibdedlom/manifest.yaml",
+  "created_at": "2026-07-10T01:08:32.940991+00:00",
+  "expires_at": "2026-07-17T01:08:32.941169+00:00",
+  "runtime_binding": {
+    "branch": "feature/phase-2-memory-profile",
+    "worktree_path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
+    "base_sha": "ea02cc653a3bac247cb8e3b382252c7be38fe814",
+    "base_ref": "main",
+    "max_commits_ahead": 50
+  },
+  "algorithm": "hmac-sha256",
+  "kid": "legacy-hmac",
+  "signature": "hmac-sha256:c911b779e68af8f2c114aa3726b0e4cbb736ed33b68676fc8e10dd1368aea89b"
+}

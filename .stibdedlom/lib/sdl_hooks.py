@@ -49,8 +49,8 @@ EXEMPT_PATTERNS = [
 
 PROTECTED_BRANCHES = ["main", "master", "release/*"]
 
-ROUTING_ATTESTATION_SCHEMA_VERSION = "sdl-routing-attestation@1"
-CLIENT_MANIFEST_SCHEMA_VERSION = "stibdedlom-client-manifest@1"
+ROUTING_ATTESTATION_SCHEMA_VERSION = "sdl-routing-attestation@2"
+CLIENT_MANIFEST_SCHEMA_VERSION = "stibdedlom-client-manifest@2"
 INVOCATION_POLICY_SCHEMA_VERSION = "0.1.0"
 
 
@@ -201,14 +201,12 @@ def load_routing_attestation_key(repo_root: Path) -> tuple[bytes | None, list[st
 
     manifest = load_manifest(repo_root)
     if manifest and manifest.get("memory_root"):
-        key_path = (
-            Path(manifest["memory_root"]).expanduser().resolve()
-            / ".stibdedlom"
-            / "trust"
-            / "routing-attestation.key"
-        )
-        if key_path.exists():
-            return key_path.read_bytes(), []
+        trust_dir = Path(manifest["memory_root"]).expanduser().resolve() / ".stibdedlom" / "trust"
+        # Prefer the canonical Phase-5 name; fall back to the legacy name.
+        for name in ("routing-attestation.hmac.key", "routing-attestation.key"):
+            key_path = trust_dir / name
+            if key_path.exists():
+                return key_path.read_bytes(), []
 
     return None, ["sdl.hook.signature_skipped"]
 
