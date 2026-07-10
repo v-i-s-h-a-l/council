@@ -448,7 +448,9 @@ def _read_commit_message(
         return commit_msg_file.read_text(encoding="utf-8")
     if commit_sha:
         return _run_git(repo_root, "log", "-1", "--format=%B", commit_sha).stdout
-    return ""
+    # Default to the current HEAD message so pre-commit hooks can resolve the
+    # parent commit's attestation even when no explicit message source is given.
+    return _run_git(repo_root, "log", "-1", "--format=%B").stdout
 
 
 def _commit_author_timestamp(repo_root: Path, sha: str) -> int:
