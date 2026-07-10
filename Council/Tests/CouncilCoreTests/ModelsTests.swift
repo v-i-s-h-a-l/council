@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import CouncilCore
 
@@ -37,5 +38,37 @@ struct ModelsTests {
     @Test func dataClassificationDeniesCloudForSensitive() async throws {
         let paths = DataClassificationPolicy.allowedComputePaths(for: .sensitivePersonal)
         #expect(paths == [.onDevice])
+    }
+
+    @Test func temporalFactDecodesWithoutDeniedPurposes() throws {
+        // Facts persisted before PBAC have no `deniedPurposes` key and must still decode.
+        let json = """
+        {
+            "id": "A0B1C2D3-E4F5-6789-0123-456789ABCDEF",
+            "subject": "user",
+            "predicate": "budget",
+            "object": "500",
+            "accessScope": ["purchaseDeliberation"],
+            "isLocked": false
+        }
+        """
+        let fact = try JSONDecoder().decode(TemporalFact.self, from: Data(json.utf8))
+        #expect(fact.accessScope == [.purchaseDeliberation])
+        #expect(fact.deniedPurposes == [])
+        #expect(fact.isLocked == false)
+    }
+
+    @Test func temporalFactRoundTripsDeniedPurposes() throws {
+        let fact = TemporalFact(
+            subject: "user",
+            predicate: "ssn",
+            object: "secret",
+            accessScope: [.userInspection],
+            deniedPurposes: [.purchaseDeliberation, .travelDeliberation]
+        )
+        let data = try JSONEncoder().encode(fact)
+        let decoded = try JSONDecoder().decode(TemporalFact.self, from: data)
+        #expect(decoded.deniedPurposes == [.purchaseDeliberation, .travelDeliberation])
+        #expect(decoded.accessScope == [.userInspection])
     }
 }

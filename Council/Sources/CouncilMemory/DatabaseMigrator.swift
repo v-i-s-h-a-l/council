@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 enum DatabaseMigrator {
-    static let schemaVersion: Int32 = 1
+    static let schemaVersion: Int32 = 2
 
     static func migrator() -> GRDB.DatabaseMigrator {
         var migrator = GRDB.DatabaseMigrator()
@@ -39,6 +39,12 @@ enum DatabaseMigrator {
                 table.column("previousHash", .text).notNull()
                 table.column("hmac", .text).notNull()
                 table.column("payloadEncrypted", .blob).notNull()
+            }
+        })
+
+        migrator.registerMigration("v2", migrate: { db in
+            try db.alter(table: TemporalFactRecord.databaseTableName) { table in
+                table.add(column: "deniedPurposesJSON", .text).notNull().defaults(to: "[]")
             }
         })
 

@@ -106,4 +106,33 @@ struct DeliberationIntegrationTests {
         let auditEntries = try await memoryService.auditLog.entries(for: episode.sessionID)
         #expect(auditEntries.count == 1)
     }
+
+    @Test func deliberationRecordsPurposeBoundAccessDecision() async throws {
+        let provider = MockInferenceProvider(
+            cannedResponses: Self.perspectiveResponses(),
+            chunkDelayNanoseconds: 0
+        )
+        let store = MockMemoryStore()
+        let auditLog = MockAuditLog()
+        let memoryService = MemoryService(store: store, auditLog: auditLog)
+        let service = DeliberationService(
+            provider: provider,
+            council: PurchaseCouncil(),
+            validators: [ConstitutionalPerspectiveValidator()],
+            context: RoutableProfileContext(),
+            options: InferenceOptions(),
+            memoryService: memoryService
+        )
+
+        let stream = await service.stateUpdates()
+        await service.startSession(question: "Should I buy a used bike?")
+        for await _ in stream {}
+
+        let entries = await auditLog.entries
+        let access = entries.first { $0.category == .memoryAccess }
+        #expect(access != nil)
+        #expect(access?.payload["purpose"] == AccessPurpose.purchaseDeliberation.rawValue)
+        #expect(access?.payload["dataElementType"] == "RoutableProfileContext")
+        #expect(access?.payload["decision"] == "allowed")
+    }
 }

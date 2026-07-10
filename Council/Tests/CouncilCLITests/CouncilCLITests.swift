@@ -511,4 +511,47 @@ struct CouncilCLITests {
         let full = try await auditLog.entries(since: nil, limit: nil, includePayloads: true)
         #expect(full.first?.payload["question"] == "secret")
     }
+
+    @Test("MemoryService purpose-filtered facts enforce denial and audit the decision")
+    func memoryServiceFactsByPurpose() async throws {
+        let store = MockMemoryStore()
+        let auditLog = MockAuditLog()
+        let service = MemoryService(store: store, auditLog: auditLog)
+
+        try await service.addFact(
+            subject: "user",
+            predicate: "ssn",
+            object: "secret",
+            accessScope: [.purchaseDeliberation, .travelDeliberation],
+            deniedPurposes: [.purchaseDeliberation]
+        )
+
+        let purchase = try await service.facts(subject: "user", purposes: [.purchaseDeliberation])
+        #expect(purchase.isEmpty)
+
+        let travel = try await service.facts(subject: "user", purposes: [.travelDeliberation])
+        #expect(travel.count == 1)
+
+        // Each purpose-filtered read records one purpose-bound access decision.
+        let allAudit = await auditLog.entries
+        let accessEntries = allAudit.filter { $0.category == .memoryAccess }
+        #expect(accessEntries.count == 2)
+        #expect(accessEntries.allSatisfy { $0.payload["dataElementType"] == "TemporalFact" })
+        #expect(accessEntries.allSatisfy { $0.payload["decision"] == "allowed" })
+    }
+
+    @Test("ProfileService routableContext excludes journal entries")
+    func profileServiceRoutableContext() async throws {
+        let vault = MockProfileVault()
+        let service = ProfileService(vault: vault)
+        try await service.addValue("Be frugal")
+        try await service.addJournalEntry("private thought", tags: ["diary"])
+
+        let context = try await service.routableContext(purposes: [.purchaseDeliberation])
+        #expect(context.values.count == 1)
+        #expect(context.values.first?.text == "Be frugal")
+        // RoutableProfileContext has no journal field by construction; the profile still holds it.
+        let profile = try await service.load()
+        #expect(profile.journalEntries.count == 1)
+    }
 }

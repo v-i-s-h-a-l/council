@@ -107,7 +107,7 @@ public actor GRDBMemoryStore: MemoryStore {
 
     public func temporalFacts(for purpose: AccessPurpose) async throws -> [TemporalFact] {
         try await temporalFacts(matching: MemoryFilter(purposes: [purpose]))
-            .filter { !$0.isLocked && $0.accessScope.contains(purpose) }
+            .filter { !$0.isLocked && $0.accessScope.contains(purpose) && !$0.deniedPurposes.contains(purpose) }
     }
 
     public func temporalFacts(matching filter: MemoryFilter) async throws -> [TemporalFact] {
@@ -125,7 +125,10 @@ public actor GRDBMemoryStore: MemoryStore {
             if let purposes = filter.purposes {
                 let purposeSet = Set(purposes)
                 let scopeSet = Set(fact.accessScope)
+                let deniedSet = Set(fact.deniedPurposes)
+                // Authorized iff request overlaps accessScope AND does not overlap deniedPurposes.
                 return !purposeSet.isDisjoint(with: scopeSet)
+                    && purposeSet.isDisjoint(with: deniedSet)
             }
             return true
         }
@@ -275,6 +278,7 @@ extension TemporalFactRecord {
         self.isLocked = fact.isLocked
         let encoder = JSONEncoder()
         self.accessScopeJSON = String(data: try encoder.encode(fact.accessScope), encoding: .utf8) ?? "[]"
+        self.deniedPurposesJSON = String(data: try encoder.encode(fact.deniedPurposes), encoding: .utf8) ?? "[]"
         self.objectEncrypted = try FieldEncryption.encrypt(
             plaintext: Data(fact.object.utf8),
             key: key
@@ -286,6 +290,8 @@ extension TemporalFactRecord {
         let objectData = try FieldEncryption.decrypt(ciphertext: objectEncrypted, key: key)
         let object = String(data: objectData, encoding: .utf8) ?? ""
         let accessScope = try decoder.decode([AccessPurpose].self, from: Data(accessScopeJSON.utf8))
+        // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v2 migration); tolerate absence defensively.
+        let deniedPurposes = (try? decoder.decode([AccessPurpose].self, from: Data(deniedPurposesJSON.utf8))) ?? []
 
         return TemporalFact(
             id: id,
@@ -295,6 +301,7 @@ extension TemporalFactRecord {
             validFrom: validFrom,
             validUntil: validUntil,
             accessScope: accessScope,
+            deniedPurposes: deniedPurposes,
             isLocked: isLocked
         )
     }
