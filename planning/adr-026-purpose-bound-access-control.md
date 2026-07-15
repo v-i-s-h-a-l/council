@@ -1,6 +1,6 @@
 # ADR-026: Purpose-Bound Access Control for Profile and Memory Context
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Lifecycle record:** `6171148c-c5fd-4d38-bd99-786de23866ac`  
 **Issue:** #26  
 **Date:** 2026-07-09

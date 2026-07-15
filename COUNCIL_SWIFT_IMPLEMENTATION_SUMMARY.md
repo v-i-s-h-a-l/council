@@ -68,7 +68,7 @@ Deliver the first real Swift implementation of the Council runtime for iOS 17 / 
 
 ---
 
-## 3. Phase 2: Expanded Memory and Profile (in progress)
+## 3. Phase 2: Expanded Memory and Profile
 
 **Lifecycle record:** `6171148c-c5fd-4d38-bd99-786de23866ac`  
 **Issue:** https://github.com/v-i-s-h-a-l/council/issues/23  
@@ -76,7 +76,15 @@ Deliver the first real Swift implementation of the Council runtime for iOS 17 / 
 
 ### Delivered
 
-- **Structured journal entries** (`JournalEntry`) with id, text, timestamp, tags, and purpose-bound access scope.
+- **Purpose-bound access control (PBAC)** — Implemented and delivered in PR #29 (ADR-026 Accepted):
+  - `AccessPurpose` / `AccessScope` labelling on values, goals, boundaries, temporal facts, and episodic gists.
+  - `deniedPurposes` support on `TemporalFact` and `EpisodicGist` for explicit prohibitions.
+  - `ProfileService.routableContext(filter:)` filters values/goals/boundaries by purpose intersection and deny set.
+  - `MemoryService.facts(subject:purposes:)` forwards purpose requirements to `GRDBMemoryStore`.
+  - `DeliberationService` resolves deliberation purpose from council type and loads filtered context before each agent call.
+  - Every PBAC access decision (allow and deny) is logged to the audit chain under `.memoryAccess`.
+  - Journal entries remain scoped to `[.userInspection]` and are never routable to agents.
+  - **Structured journal entries** (`JournalEntry`) with id, text, timestamp, tags, and purpose-bound access scope.
   - `council profile journal add` with `--tag`, `--date`, and `--stdin` for multi-line/scriptable input.
   - `council profile journal list` with tag filters (AND semantics), date range filters, `--reveal`, and `--limit`.
   - `council profile journal remove <id>`.
@@ -88,8 +96,8 @@ Deliver the first real Swift implementation of the Council runtime for iOS 17 / 
   - CLI options `--tag`, `--status`, and `--severity` added to the existing `add` commands.
 - **Legacy profile migration**: `UserProfile` decoder migrates old `journalExcerpts: ClientConfidentialContainer` to `journalEntries: [JournalEntry]` with `[.userInspection]` scope.
 - **Planning ADRs** for the remaining Phase 2 issues:
-  - `planning/adr-025-sqlcipher-migration.md` — full-database encryption approach for GRDB stores.
-  - `planning/adr-026-purpose-bound-access-control.md` — PBAC policy model and `DeliberationService` integration sketch.
+  - `planning/adr-025-sqlcipher-migration.md` — full-database encryption approach for GRDB stores (follow-up, in progress on issue #25).
+  - `planning/adr-026-purpose-bound-access-control.md` — PBAC policy model and `DeliberationService` integration (**Accepted** — implemented and delivered in PR #29).
 
 ### Verification results (Phase 2)
 
