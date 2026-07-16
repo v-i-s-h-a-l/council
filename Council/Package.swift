@@ -17,7 +17,10 @@ let package = Package(
         .executable(name: "council", targets: ["CouncilCLI"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift.git", exact: "0.31.5"),
+        // Local fork of mlx-swift with #if os(macOS) guards on encuda's Process usage.
+        // Upstream v0.31.5 fails to compile for iOS Simulator because encuda uses
+        // Process (macOS/Linux only). See: council issue #16.
+        .package(path: "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/mlx-swift"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", exact: "3.31.4"),
         .package(url: "https://github.com/huggingface/swift-huggingface", from: "0.9.0"),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),

@@ -1,0 +1,35 @@
+{
+  "schema_version": "sdl-routing-attestation@2",
+  "issue": 16,
+  "chain_id": "councilapp-xcodebuild",
+  "node_id": "16",
+  "goal": "Fix xcodebuild validation for CouncilApp macOS and iOS Simulator builds",
+  "allowed_paths": [
+    "CouncilApp/project.yml",
+    "CouncilApp/generate-project.sh",
+    "CouncilApp/CouncilApp.xcodeproj",
+    "CouncilApp/Sources/CouncilApp",
+    "CouncilApp/Sources/CouncilUI/Views/VoiceInputButton.swift",
+    "Council/Package.swift",
+    "docs/PLAN.md",
+    "registry/lifecycle",
+    "registry/telemetry"
+  ],
+  "envelope_hash": "sha256:e9910fbbac83a7a447e905f53bfb62f22e7c8c7d04d5c3fe90125e41e63e9847",
+  "policy_ref": ".stibdedlom/invocation-policy.yaml",
+  "manifest_path": ".stibdedlom/manifest.yaml",
+  "base_ref": "sdl/issue-16-councilapp-xcodebuild",
+  "created_at": "2026-07-16T04:19:30.086667+00:00",
+  "expires_at": "2026-07-23T04:19:30.086667+00:00",
+  "kid": "rk-2026-07-09-44177cda",
+  "algorithm": "ed25519",
+  "runtime_binding": {
+    "branch": "sdl/issue-16-councilapp-xcodebuild",
+    "worktree_path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council-worktrees/councilapp",
+    "base_sha": "a08c345919024bef165bf1fe4f4899675357a707",
+    "base_ref": "sdl/issue-16-councilapp-xcodebuild",
+    "max_commits_ahead": 50
+  },
+  "capability": "capability-apple-native-development",
+  "signature": "ed25519:8mKvbvIr2vKRhD5H10qC8HXYslwmO3Gq8ehs1WNa/9iETofsg976RPRUWfkx9Ql7OTtDfW8QbH5niIr22g1uAw=="
+}
