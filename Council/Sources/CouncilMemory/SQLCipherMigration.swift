@@ -187,7 +187,7 @@ public enum SQLCipherMigration {
 
     // MARK: - Private
 
-    static func markerPath(for databasePath: String) -> String {
+    public static func markerPath(for databasePath: String) -> String {
         databasePath + ".sqlcipher"
     }
 }

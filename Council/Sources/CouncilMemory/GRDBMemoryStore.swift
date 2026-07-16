@@ -82,7 +82,16 @@ public actor GRDBMemoryStore: MemoryStore {
             dbQueue = try DatabaseQueue(path: path)
         }
         // Key is already applied via prepareDatabase; pass useSQLCipher: false to skip re-applying.
-        return try GRDBMemoryStore(dbQueue: dbQueue, profileKey: profileKey, salt: resolvedSalt, useSQLCipher: false)
+        let store = try GRDBMemoryStore(dbQueue: dbQueue, profileKey: profileKey, salt: resolvedSalt, useSQLCipher: false)
+
+        // Write the SQLCipher marker so future launches don't misdetect this as a legacy database.
+        if useSQLCipher {
+            try? Data("sqlcipher-v1\n".utf8).write(
+                to: URL(fileURLWithPath: SQLCipherMigration.markerPath(for: path))
+            )
+        }
+
+        return store
     }
 
     // MARK: - Episodes

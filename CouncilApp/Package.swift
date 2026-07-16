@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../Council"),
-        .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.9.0"),
+        .package(path: "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/GRDB.swift-sqlcipher"),
     ],
     targets: [
         .executableTarget(
@@ -20,7 +20,7 @@ let package = Package(
                 .product(name: "CouncilAgents", package: "Council"),
                 .product(name: "CouncilMemory", package: "Council"),
                 .product(name: "CouncilInference", package: "Council"),
-                .product(name: "GRDB", package: "GRDB.swift"),
+                .product(name: "GRDB", package: "GRDB.swift-sqlcipher"),
             ],
             path: "Sources/CouncilApp",
             swiftSettings: [
