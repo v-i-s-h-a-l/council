@@ -77,13 +77,14 @@ Deliver the first real Swift implementation of the Council runtime for iOS 17 / 
 ### Delivered
 
 - **Purpose-bound access control (PBAC)** — Implemented and delivered in PR #29 (ADR-026 Accepted):
-  - `AccessPurpose` / `AccessScope` labelling on values, goals, boundaries, temporal facts, and episodic gists.
-  - `deniedPurposes` support on `TemporalFact` and `EpisodicGist` for explicit prohibitions.
-  - `ProfileService.routableContext(filter:)` filters values/goals/boundaries by purpose intersection and deny set.
-  - `MemoryService.facts(subject:purposes:)` forwards purpose requirements to `GRDBMemoryStore`.
-  - `DeliberationService` resolves deliberation purpose from council type and loads filtered context before each agent call.
-  - Every PBAC access decision (allow and deny) is logged to the audit chain under `.memoryAccess`.
+  - `TemporalFact.accessScope` and `TemporalFact.deniedPurposes` for allow/deny purpose labelling.
+  - `MemoryService.facts(subject:purposes:)` forwards purpose requirements to `GRDBMemoryStore`; store enforces allow (`accessScope` intersection) and deny (`deniedPurposes` intersection) sets.
+  - `DeliberationService` resolves deliberation purpose from council type and logs the profile-context access decision to the audit chain under `.memoryAccess`.
+  - `ProfileService.routableContext(purposes:)` is the PBAC choke point — journal entries are never returned regardless of purpose.
+  - `RuntimeAssembly` wires purpose-filtered context loading before deliberation.
+  - `council memory fact add --denied-purpose` sets explicit prohibitions on facts.
   - Journal entries remain scoped to `[.userInspection]` and are never routable to agents.
+  - **Follow-up (not blocking):** per-purpose narrowing of values/goals/boundaries in `routableContext`, `EpisodicGist.deniedPurposes`, and per-item deny-decision audit logging.
   - **Structured journal entries** (`JournalEntry`) with id, text, timestamp, tags, and purpose-bound access scope.
   - `council profile journal add` with `--tag`, `--date`, and `--stdin` for multi-line/scriptable input.
   - `council profile journal list` with tag filters (AND semantics), date range filters, `--reveal`, and `--limit`.

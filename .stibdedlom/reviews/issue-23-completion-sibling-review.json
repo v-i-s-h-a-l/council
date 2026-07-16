@@ -1,0 +1,90 @@
+{
+  "schema_version": "1.0.0",
+  "record_id": "94a690a5-0b72-4acb-99d8-e6f442fc494e",
+  "capability_id": "capability-apple-native-development",
+  "target_lifecycle": "draft",
+  "approver": "capability-implementation-reviewer",
+  "approver_type": "capability",
+  "verdict": "concern",
+  "pr": "https://github.com/v-i-s-h-a-l/council/pull/30",
+  "branch": "sdl/issue-23-phase-2-completion",
+  "issue": 23,
+  "self_authorization_check": {
+    "status": "passed",
+    "caller_id": "capability-apple-native-development",
+    "callee_id": "capability-implementation-reviewer",
+    "distinct_identity": true,
+    "promotion_authority_override": false,
+    "attestation_uri": ".stibdedlom/routing/23-completion.json",
+    "dispatch_instance_tag": "issue-23-completion-sibling-review"
+  },
+  "tier": 1,
+  "required_reviewers": [
+    "sibling-agent"
+  ],
+  "sibling_review": {
+    "provider": "sibling-agent",
+    "dispatch_instance_tag": "issue-23-completion-sibling-review",
+    "summary": "Docs-only PR marking Phase 2 complete. PLAN.md markers, ADR-026 acceptance, journal CLI, legacy migration, and .memoryAccess audit category all verified against code and git history; swift test shows no regression (exit=1 MLX metallib abort is pre-existing on main a08c345; 135 tests executed, 0 failures on both). However the implementation summary overclaims the delivered PBAC surface in four places, and the three new routing attestations lack the envelope_hash/signature integrity fields carried by existing attestations.",
+    "findings": [
+      {
+        "finding_id": "issue23c-sr-001",
+        "severity": "critical",
+        "rule_ref": "sdl.review.correctness",
+        "affected_ref": "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+        "issue": "Claims `ProfileService.routableContext(filter:)` filters values/goals/boundaries by purpose intersection and deny set. The implemented signature is `routableContext(purposes:)` (ProfileService.swift:146) and it performs NO filtering \u2014 it returns RoutableProfileContext(profile:) in full, with the code comment stating purposes is only a choke point for future filtering.",
+        "remediation": "Correct the claim to match the implementation: rename to routableContext(purposes:) and state that per-purpose filtering of values/goals/boundaries is not yet implemented, or implement the filtering."
+      },
+      {
+        "finding_id": "issue23c-sr-002",
+        "severity": "critical",
+        "rule_ref": "sdl.review.correctness",
+        "affected_ref": "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+        "issue": "Claims `deniedPurposes` support on `TemporalFact` and `EpisodicGist`, and AccessPurpose/AccessScope labelling on values, goals, boundaries, temporal facts, and episodic gists. Only `TemporalFact` (Models.swift:351-352) and `JournalEntry` (Models.swift:226) carry accessScope; only TemporalFact has deniedPurposes. `EpisodicGist` (Models.swift:404) has neither field, and Value/Goal/Boundary have no purpose labelling. ADR-026 proposed deniedPurposes on both TemporalFact and EpisodicGist, so the Accepted status plus 'implemented and delivered in PR #29' overstates delivery.",
+        "remediation": "Restrict the claims to TemporalFact (and JournalEntry accessScope), and either implement EpisodicGist purpose labelling or record it as a deliberate deviation in ADR-026 before marking it Accepted."
+      },
+      {
+        "finding_id": "issue23c-sr-003",
+        "severity": "important",
+        "rule_ref": "sdl.review.correctness",
+        "affected_ref": "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+        "issue": "Claims every PBAC access decision (allow and deny) is logged under .memoryAccess. No deny decision is logged anywhere in Council/Sources; only aggregate 'allowed' entries are written (MemoryService.facts(subject:purposes:), DeliberationService). Store-level denials in GRDBMemoryStore are silent filter exclusions.",
+        "remediation": "Reword to 'allowed decisions are logged' or add deny-decision audit entries."
+      },
+      {
+        "finding_id": "issue23c-sr-004",
+        "severity": "important",
+        "rule_ref": "sdl.review.governance",
+        "affected_ref": ".stibdedlom/routing/16.json, .stibdedlom/routing/23-completion.json, .stibdedlom/routing/25.json",
+        "issue": "The three new attestations are well-formed JSON with required scalar fields and a valid expiry (2026-07-22), but omit `envelope_hash` and `signature`, which both pre-existing attestations (23.json, 26.json) carry, and omit `base_sha` inside runtime_binding. With agent_integration.attested=true and kid 'legacy-hmac', these envelopes cannot be integrity-verified. Additionally, runtime_binding.branch in 16.json (sdl/issue-16) and 25.json (sdl/issue-25-sqlcipher) does not match the branch they are committed on (sdl/issue-23-phase-2-completion).",
+        "remediation": "Regenerate the attestations through the signing path so they carry envelope_hash/signature and base_sha, and either commit 16.json/25.json on their own branches or document why they are staged here."
+      },
+      {
+        "finding_id": "issue23c-sr-005",
+        "severity": "info",
+        "rule_ref": "sdl.review.governance",
+        "affected_ref": "commit e48f1b5",
+        "issue": "Commit trailers verified: SDL-Commit-Author, SDL-Routing-Attestation: 23, Task-Ref: issue-23-completion, and Lifecycle-Record-ID e0e48a68 matches the node_id/lifecycle_record_id in 23-completion.json.",
+        "remediation": "None."
+      },
+      {
+        "finding_id": "issue23c-sr-006",
+        "severity": "info",
+        "rule_ref": "sdl.review.plan-tracking",
+        "affected_ref": "docs/PLAN.md",
+        "issue": "Phase 2 markers verified accurate: profile ingestion merged as PR #28 and PBAC as PR #29 (both confirmed in main git history); SQLCipher issue #25 confirmed OPEN on GitHub, consistent with the in-progress marker. Journal CLI (add/list/remove with --tag/--date/--stdin/--reveal/--limit), legacy journalExcerpts migration, and userInspection-only journal scoping all verified in code.",
+        "remediation": "None."
+      },
+      {
+        "finding_id": "issue23c-sr-007",
+        "severity": "info",
+        "rule_ref": "sdl.review.regression",
+        "affected_ref": "Council/",
+        "issue": "swift test on the PR branch executes 135 tests with 0 failures but exits 1 due to an MLX 'Failed to load the default metallib' abort at the end of the run. Reproduced identically on main (a08c345), so it is a pre-existing environment limitation (already documented in the summary), not a regression from this docs-only PR.",
+        "remediation": "None for this PR; consider gating the MLX-loading test path so the suite exits 0 off-device."
+      }
+    ]
+  },
+  "timestamp": "2026-07-16T04:50:02+00:00",
+  "audit_hash": "sha256:74f615d0ce307e5c8d47753708b0094025b887b8d08ed0cb5420105c1173d737"
+}
