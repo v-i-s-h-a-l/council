@@ -57,7 +57,7 @@ COUNCIL_RUN_BENCHMARKS=1 swift test --filter CouncilBenchmarks
 
 ## Phase 2: Expanded Memory and Profile
 - Expand profile ingestion: values, goals, boundaries, and basic journal ingestion.
-- SQLCipher full-database encryption.
+- SQLCipher full-database encryption (implemented via forked GRDB + SQLCipher.swift; see ADR-025).
 - Refine purpose-bound access control for richer profile data.
 
 ## Phase 3: Secretary Layer

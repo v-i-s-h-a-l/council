@@ -5,10 +5,15 @@ import GRDB
 import Security
 
 /// `MemoryStore` implementation backed by GRDB with encrypted sensitive columns.
+///
+/// When built against the SQLCipher fork of GRDB, the entire database file is
+/// encrypted at the page level (full-database encryption). The existing
+/// column-level AES-256-GCM encryption remains as defense-in-depth.
 public actor GRDBMemoryStore: MemoryStore {
     enum GRDBMemoryStoreError: Error {
         case saltGenerationFailed
         case invalidSaltLength
+        case sqlCipherKeyFailed(String)
     }
 
     let dbQueue: DatabaseQueue
@@ -22,9 +27,22 @@ public actor GRDBMemoryStore: MemoryStore {
     ///   - salt: Optional 16-byte salt. If supplied, it is used directly. If omitted, the salt is
     ///     loaded from `salt.bin` next to the database file, from the keychain as a fallback, or
     ///     generated randomly and persisted in both locations on first creation.
-    public init(dbQueue: DatabaseQueue, profileKey: Data, salt: Data? = nil) throws {
+    ///   - useSQLCipher: When `true` (default), apply the derived key via `PRAGMA key` so the
+    ///     entire database file is encrypted by SQLCipher. For file-based databases, the queue
+    ///     should be created with ``sqlCipherConfiguration(key:)`` instead — see ``make(path:profileKey:salt:useSQLCipher:)``.
+    ///     The `PRAGMA key` path here is only effective for in-memory databases.
+    public init(dbQueue: DatabaseQueue, profileKey: Data, salt: Data? = nil, useSQLCipher: Bool = true) throws {
         self.dbQueue = dbQueue
         self.databaseKey = Self.deriveDatabaseKey(from: profileKey, salt: try Self.resolveSalt(dbQueue: dbQueue, injectedSalt: salt))
+        if useSQLCipher {
+            let path = dbQueue.path
+            if path.isEmpty || path == ":memory:" {
+                // In-memory databases: PRAGMA key works because there is no file header to conflict.
+                try Self.applySQLCipherKey(dbQueue: dbQueue, key: databaseKey)
+            }
+            // File-based queues must be created with sqlCipherConfiguration(key:) so that
+            // PRAGMA key runs inside prepareDatabase before GRDB touches the file.
+        }
         try Self.registerMigrations(dbQueue: dbQueue)
     }
 
@@ -33,22 +51,38 @@ public actor GRDBMemoryStore: MemoryStore {
     /// The containing directory is created automatically. A 16-byte salt is generated and
     /// persisted next to the database on first creation unless `salt` is supplied.
     ///
+    /// When `useSQLCipher` is `true` (default), the database is opened with
+    /// `Configuration.prepareDatabase` that applies `PRAGMA key` before any other SQL runs,
+    /// ensuring the file is encrypted from the first page.
+    ///
     /// - Parameters:
     ///   - path: File path for the SQLite database.
     ///   - profileKey: The profile key from which the database encryption key is derived.
     ///   - salt: Optional 16-byte salt. When provided, keychain fallback is skipped.
+    ///   - useSQLCipher: When `true` (default), open the database with SQLCipher full-database
+    ///     encryption using the derived key.
     public static func make(
         path: String,
         profileKey: Data,
-        salt: Data? = nil
+        salt: Data? = nil,
+        useSQLCipher: Bool = true
     ) async throws -> GRDBMemoryStore {
         let url = URL(fileURLWithPath: path)
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let dbQueue = try DatabaseQueue(path: path)
-        return try GRDBMemoryStore(dbQueue: dbQueue, profileKey: profileKey, salt: salt)
+        let resolvedSalt = try resolveSalt(forPath: path, injectedSalt: salt)
+        let databaseKey = deriveDatabaseKey(from: profileKey, salt: resolvedSalt)
+        let dbQueue: DatabaseQueue
+        if useSQLCipher {
+            let config = sqlCipherConfiguration(key: databaseKey)
+            dbQueue = try DatabaseQueue(path: path, configuration: config)
+        } else {
+            dbQueue = try DatabaseQueue(path: path)
+        }
+        // Key is already applied via prepareDatabase; pass useSQLCipher: false to skip re-applying.
+        return try GRDBMemoryStore(dbQueue: dbQueue, profileKey: profileKey, salt: resolvedSalt, useSQLCipher: false)
     }
 
     // MARK: - Episodes
@@ -151,7 +185,17 @@ public actor GRDBMemoryStore: MemoryStore {
 
     // MARK: - Salt resolution and key derivation
 
-    private static func resolveSalt(dbQueue: DatabaseQueue, injectedSalt: Data?) throws -> Data {
+    /// Resolves the salt for a database identified by its queue (used by `init`).
+    static func resolveSalt(dbQueue: DatabaseQueue, injectedSalt: Data?) throws -> Data {
+        try resolveSalt(forPath: dbQueue.path, injectedSalt: injectedSalt)
+    }
+
+    /// Resolves the salt for a database identified by its file path.
+    ///
+    /// When the path is empty or `:memory:`, an ephemeral (non-persisted) salt is generated.
+    /// Otherwise the salt is loaded from `salt.bin` next to the database, from the keychain as a
+    /// fallback, or generated randomly and persisted in both locations on first creation.
+    static func resolveSalt(forPath path: String, injectedSalt: Data?) throws -> Data {
         if let injectedSalt {
             guard injectedSalt.count == 16 else {
                 throw GRDBMemoryStoreError.invalidSaltLength
@@ -159,7 +203,6 @@ public actor GRDBMemoryStore: MemoryStore {
             return injectedSalt
         }
 
-        let path = dbQueue.path
         if path.isEmpty || path == ":memory:" {
             // In-memory database: generate an ephemeral salt that is not persisted.
             return try generateRandomSalt()
@@ -197,7 +240,7 @@ public actor GRDBMemoryStore: MemoryStore {
         return salt
     }
 
-    private static func deriveDatabaseKey(from profileKey: Data, salt: Data) -> Data {
+    static func deriveDatabaseKey(from profileKey: Data, salt: Data) -> Data {
         let inputKey = SymmetricKey(data: profileKey)
         let info = Data("com.council.memory.database.v1".utf8)
         let derived = HKDF<SHA256>.deriveKey(
@@ -211,6 +254,41 @@ public actor GRDBMemoryStore: MemoryStore {
 
     private static func registerMigrations(dbQueue: DatabaseQueue) throws {
         try DatabaseMigrator.migrator().migrate(dbQueue)
+    }
+
+    // MARK: - SQLCipher
+
+    /// Applies the derived 32-byte key to the database via `PRAGMA key` in raw-key mode.
+    ///
+    /// The hex string is the lower-case representation of the 32-byte `databaseKey`, formatted as
+    /// `x'<64-hex-characters>'`. This avoids an additional PBKDF2 round and preserves the existing
+    /// key hierarchy.
+    ///
+    /// Must be called before any other database operations (migrations, reads, writes).
+    /// For `DatabaseQueue` (single connection), calling once is sufficient.
+    static func applySQLCipherKey(dbQueue: DatabaseQueue, key: Data) throws {
+        let hexKey = key.map { String(format: "%02x", $0) }.joined()
+        let rawKey = "x'\(hexKey)'"
+        try dbQueue.writeWithoutTransaction { db in
+            try db.execute(sql: "PRAGMA key = \"\(rawKey)\"")
+        }
+    }
+
+    /// Returns a GRDB `Configuration` that applies `PRAGMA key` via `prepareDatabase`.
+    ///
+    /// Use this when creating a `DatabaseQueue` for a file-based database so that the SQLCipher
+    /// key is set before GRDB runs any other SQL (including its own `PRAGMA journal_mode` etc.).
+    ///
+    /// - Parameter key: The 32-byte derived database key.
+    /// - Returns: A `Configuration` suitable for `DatabaseQueue(path:configuration:)`.
+    static func sqlCipherConfiguration(key: Data) -> Configuration {
+        let hexKey = key.map { String(format: "%02x", $0) }.joined()
+        let rawKey = "x'\(hexKey)'"
+        var config = Configuration()
+        config.prepareDatabase { db in
+            try db.execute(sql: "PRAGMA key = \"\(rawKey)\"")
+        }
+        return config
     }
 }
 

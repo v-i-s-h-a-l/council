@@ -21,7 +21,7 @@ let package = Package(
         .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", exact: "3.31.4"),
         .package(url: "https://github.com/huggingface/swift-huggingface", from: "0.9.0"),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
-        .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.9.0"),
+        .package(path: "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/GRDB.swift-sqlcipher"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.5.0"),
     ],
     targets: [
@@ -64,7 +64,7 @@ let package = Package(
             name: "CouncilMemory",
             dependencies: [
                 "CouncilCore",
-                .product(name: "GRDB", package: "GRDB.swift"),
+                .product(name: "GRDB", package: "GRDB.swift-sqlcipher"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
