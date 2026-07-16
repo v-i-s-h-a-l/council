@@ -1,0 +1,38 @@
+{
+  "schema_version": "sdl-routing-attestation@2",
+  "issue": 25,
+  "chain_id": "sqlcipher-migration",
+  "node_id": "b7b5b906-8db1-4eb8-a759-cece3da2a7b2",
+  "goal": "Migrate GRDB memory/audit stores to SQLCipher full-database encryption",
+  "capability": "capability-apple-native-development",
+  "allowed_paths": [
+    "Council/Package.swift",
+    "Council/Package.resolved",
+    "Council/Sources/CouncilMemory",
+    "Council/Sources/CouncilCore",
+    "Council/Tests/CouncilMemoryTests",
+    "Council/Tests/CouncilIntegrationTests",
+    "planning/adr-025-sqlcipher-migration.md",
+    "docs/PLAN.md",
+    "registry",
+    "README.md",
+    "COUNCIL_SWIFT_IMPLEMENTATION_SUMMARY.md",
+    ".stibdedlom/routing"
+  ],
+  "policy_ref": ".stibdedlom/invocation-policy.yaml",
+  "manifest_path": ".stibdedlom/manifest.yaml",
+  "created_at": "2026-07-16T04:37:37.028771+00:00",
+  "expires_at": "2026-07-23T04:37:37.028920+00:00",
+  "runtime_binding": {
+    "branch": "sdl/issue-25-sqlcipher-migration",
+    "worktree_path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council-worktrees/sqlcipher",
+    "base_sha": "a08c345",
+    "base_ref": "main",
+    "max_commits_ahead": 50
+  },
+  "lifecycle_record_id": "b7b5b906-8db1-4eb8-a759-cece3da2a7b2",
+  "max_commits_ahead": 50,
+  "algorithm": "hmac-sha256",
+  "kid": "legacy-hmac",
+  "envelope_hash": "sha256:bae3c71f127bf6c281e5a9c924be7883158f1c8c634656fc2c917bee56850198"
+}

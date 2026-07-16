@@ -161,7 +161,7 @@ AC16 thresholds (on reference hardware):
 - **iOS Simulator `xcodebuild`** — Building `CouncilApp.xcodeproj` for iOS Simulator is blocked by an upstream `mlx-swift` issue: the `encuda` executable target (used by the `CudaBuild` plugin) references the macOS-only `Process` API and is incorrectly compiled for the simulator target. macOS `xcodebuild` succeeds. Physical-device and App Store builds are expected to work because `encuda` is a host-side plugin dependency.
 - **Performance benchmarks** — The `CouncilBenchmarks` target is ready and compiles. Set `COUNCIL_RUN_BENCHMARKS=1` to execute it. Because MLX cannot load its default metallib outside an app bundle, AC16 numbers must be collected on reference hardware (iPhone 12 / 4 GB RAM for iOS, Apple Silicon Mac for macOS).
 - **Runtime constitutional enforcement** — Remains a future phase; current enforcement is prompt-based + validator-based.
-- **SQLCipher full-database encryption** — Documented as Phase 2 follow-up.
+- **SQLCipher full-database encryption** — Implemented via forked GRDB 7.10.0 + SQLCipher.swift 4.17.0 (ADR-025). Local path dependency; requires the fork to be co-located with the council repo.
 - **Model manifests are process-local** for this phase; `council model list/register/consent` state does not persist across process restarts.
 
 ---

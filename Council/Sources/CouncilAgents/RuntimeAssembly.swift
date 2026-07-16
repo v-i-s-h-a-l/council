@@ -76,6 +76,16 @@ public actor RuntimeAssembly {
             at: root.appendingPathComponent("salt.bin"),
             useCompleteProtection: useSecureEnclave
         )
+
+        // Migrate legacy plaintext database to SQLCipher if needed.
+        if SQLCipherMigration.detectLegacyDatabase(at: dbPath) {
+            _ = try SQLCipherMigration.migrate(
+                legacyPath: dbPath,
+                profileKey: rawKey,
+                salt: salt
+            )
+        }
+
         self.memoryStore = try await GRDBMemoryStore.make(
             path: dbPath,
             profileKey: rawKey,

@@ -1,9 +1,10 @@
 # ADR-025: SQLCipher Full-Database Encryption for GRDB Stores
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Lifecycle record:** `6171148c-c5fd-4d38-bd99-786de23866ac`  
 **Issue:** #25  
-**Date:** 2026-07-09
+**Date:** 2026-07-09  
+**Implementation date:** 2026-07-15
 
 ## Context
 
@@ -18,9 +19,9 @@ For a local-first, privacy-sensitive system, this metadata leakage is a residual
 
 ## Decision
 
-Adopt SQLCipher as the SQLite backend for GRDB once the project is ready to maintain a forked GRDB dependency. Until Swift Package Manager supports package traits, GRDB must be forked to swap the SQLite backend for SQLCipher ([GRDB 7.10.0 Swift Forums announcement](https://forums.swift.org/t/grdb-v7-10-0-android-linux-windows-and-sqlcipher-swiftpm/84754)).
+Adopt SQLCipher as the SQLite backend for GRDB. Until Swift Package Manager supports package traits, GRDB must be forked to swap the SQLite backend for SQLCipher ([GRDB 7.10.0 Swift Forums announcement](https://forums.swift.org/t/grdb-v7-10-0-android-linux-windows-and-sqlcipher-swiftpm/84754)).
 
-The actual dependency swap is a follow-up PR; this ADR documents the migration approach, keying, rollback, and validation plan.
+The fork is maintained at `GRDB.swift-sqlcipher/` (tag `v7.10.0-sqlcipher-council-1`) and referenced as a local path dependency in `Council/Package.swift`. The SQLCipher library is provided by `sqlcipher/SQLCipher.swift` (4.17.0 binary XCFramework).
 
 ## Consequences
 
@@ -104,6 +105,35 @@ Implement `SQLCipherMigration` in `CouncilMemory`:
 - **Salt preservation:** The 16-byte salt used to derive the database key must not change. `SQLCipherMigration` reuses the existing `salt.bin`.
 - **Audit chain integrity:** Audit entries are cryptographically chained. The migration copies entries in chronological order and preserves `previousHash` and `hmac` values.
 - **No data loss for in-memory databases:** Tests that use `:memory:` databases will use SQLCipher in-memory mode where supported; otherwise they will continue to use the current GRDB until the fork stabilizes.
+
+## Implementation notes
+
+### GRDB fork setup
+
+The fork at `GRDB.swift-sqlcipher/` (tag `v7.10.0-sqlcipher-council-1`) follows the `GRDB+SQLCipher` comments in the stock `Package.swift`. One additional fix was required: the fork's `GRDBSQLCipher` target was renamed to `GRDBSQLite` (with a matching `module GRDBSQLite` modulemap) so that all 33 `import GRDBSQLite` statements in GRDB sources resolve to the SQLCipher backend without modification. The stale system-library `Sources/GRDBSQLite/` directory was removed.
+
+SQLCipher is provided by the `sqlcipher/SQLCipher.swift` package (4.17.0), which ships a pre-built XCFramework — no source compilation required.
+
+### Key application order
+
+For file-based databases, `PRAGMA key` must be set via `Configuration.prepareDatabase` **before** GRDB runs its own initialization SQL (`PRAGMA journal_mode`, `SELECT * FROM sqlite_master`). The `GRDBMemoryStore.make(path:)` and `GRDBAuditLog.make(path:)` factory methods resolve the salt and derive the key before creating the `DatabaseQueue`, then pass a `sqlCipherConfiguration(key:)` to the queue initializer.
+
+For in-memory databases (`:memory:`), `PRAGMA key` applied via `writeWithoutTransaction` works because there is no file header to conflict with. The `init(dbQueue:)` path uses this approach.
+
+### Shared queue compatibility
+
+When `GRDBMemoryStore` and `GRDBAuditLog` share a single in-memory `DatabaseQueue` (as in `ProfileMemoryIntegrationTests`), the second initializer detects existing tables via `hasExistingTables()` and skips re-applying `PRAGMA key`, preventing a key mismatch.
+
+### API changes
+
+- `GRDBMemoryStore.init` and `GRDBAuditLog.init` gain a `useSQLCipher: Bool = true` parameter and an optional `salt: Data?` parameter.
+- `GRDBMemoryStore.make(path:)` and `GRDBAuditLog.make(path:)` gain the same parameters.
+- `GRDBMemoryStore.resolveSalt(forPath:injectedSalt:)`, `deriveDatabaseKey(from:salt:)`, `applySQLCipherKey(dbQueue:key:)`, and `sqlCipherConfiguration(key:)` are internal (not private) for use by `GRDBAuditLog` and `SQLCipherMigration`.
+
+### New files
+
+- `Council/Sources/CouncilMemory/SQLCipherMigration.swift` — `SQLCipherMigration` enum with `detectLegacyDatabase(at:)`, `isMigrated(at:)`, `migrate(legacyPath:profileKey:salt:)`, and `rollback(at:)`.
+- `Council/Tests/CouncilMemoryTests/SQLCipherMigrationTests.swift` — 12 tests covering detection, encryption, migration, rollback, and marker file validation.
 
 ## References
 

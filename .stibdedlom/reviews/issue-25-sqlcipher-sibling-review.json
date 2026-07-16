@@ -1,0 +1,138 @@
+{
+  "schema_version": "1.0.0",
+  "record_id": "issue-25-sqlcipher-sibling-review",
+  "capability_id": "capability-apple-native-development",
+  "target_lifecycle": "b7b5b906-8db1-4eb8-a759-cece3da2a7b2",
+  "approver": "capability-implementation-reviewer",
+  "approver_type": "capability",
+  "verdict": "CONCERN",
+  "pr": "https://github.com/v-i-s-h-a-l/council/pull/31",
+  "branch": "sdl/issue-25-sqlcipher-migration",
+  "head_sha": "342b4a7",
+  "self_authorization_check": {
+    "status": "passed",
+    "caller_id": "capability-apple-native-development",
+    "callee_id": "capability-implementation-reviewer",
+    "distinct_identity": true,
+    "promotion_authority_override": false,
+    "attestation_uri": ".stibdedlom/routing/25.json",
+    "dispatch_instance_tag": "issue-25-sqlcipher-sibling-review"
+  },
+  "tier": 1,
+  "required_reviewers": [
+    "sibling-agent"
+  ],
+  "verification": {
+    "swift_test": {
+      "command": "swift test (Council/)",
+      "result": "exit 0, all suites pass; SQLCipherMigrationTests: 11 tests passed",
+      "note": "Commit message and ADR-025 claim 12 new tests; actual count is 11."
+    },
+    "encryption_evidence": "Test sqlCipherDatabaseCannotBeOpenedWithoutKey proves opening the file without a key throws at DatabaseQueue init (page-level encryption real, not a no-op); sqlCipherDatabaseOpensWithCorrectKey proves round-trip.",
+    "trailers": "SDL-Commit-Author: capability-apple-native-development; SDL-Routing-Attestation: 25; Task-Ref: issue-25; Lifecycle-Record-ID b7b5b906 matches routing/25.json node_id. All changed files within attestation allowed_paths.",
+    "ci": "sdl-governance check FAILING on this PR and on all other recent branches (issue-16, issue-23): workflow expects .stibdedlom/bin/validate-schemas.py but .stibdedlom/bin is an uninitialized git submodule in CI checkout. Pre-existing, repo-wide; not caused by this PR."
+  },
+  "sibling_review": {
+    "provider": "sibling-agent",
+    "dispatch_instance_tag": "issue-25-sqlcipher-sibling-review",
+    "findings": [
+      {
+        "finding_id": "i25-sr-001",
+        "severity": "critical",
+        "rule_ref": "sdl.review.build",
+        "affected_ref": "Council/Package.swift",
+        "issue": "GRDB dependency is an absolute local path (/Users/vishalsingh/Documents/v-i-s-h-a-l/github/GRDB.swift-sqlcipher). No other machine or CI can resolve the package graph; merging to main makes the repo unbuildable for anyone but the author.",
+        "remediation": "Publish the fork (tag v7.10.0-sqlcipher-council-1) to a remote URL and pin it, or use a repo-relative path with a documented bootstrap step, before merge."
+      },
+      {
+        "finding_id": "i25-sr-002",
+        "severity": "critical",
+        "rule_ref": "sdl.review.build",
+        "affected_ref": "CouncilApp/Package.swift",
+        "issue": "CouncilApp still pins remote groue/GRDB.swift 7.9.0 and links product GRDB from it while also depending on ../Council, which now vendors a different package also exporting module GRDB. Two modules named GRDB in one build graph breaks the CouncilApp SwiftPM build on this branch.",
+        "remediation": "Drop the direct GRDB dependency from CouncilApp/Package.swift (app sources do not import GRDB) or point it at the same fork. Committed xcodeproj has no GRDB references and is unaffected. CouncilApp was outside the routing attestation's allowed_paths, so this needs a follow-up attestation or an expanded one."
+      },
+      {
+        "finding_id": "i25-sr-003",
+        "severity": "important",
+        "rule_ref": "sdl.review.migration",
+        "affected_ref": "Council/Sources/CouncilAgents/RuntimeAssembly.swift",
+        "issue": "SQLCipherMigration is never invoked from production code. RuntimeAssembly opens stores with useSQLCipher defaulting to true, so an existing plaintext memory.sqlite from a previous install fails to open (SQLITE_NOTADB) at startup with no migration attempted.",
+        "remediation": "Wire detectLegacyDatabase/migrate into store startup (CLI and app), or explicitly document that wiring is deferred to a follow-up issue and that this release breaks pre-existing databases."
+      },
+      {
+        "finding_id": "i25-sr-004",
+        "severity": "important",
+        "rule_ref": "sdl.review.migration",
+        "affected_ref": "Council/Sources/CouncilMemory/SQLCipherMigration.swift",
+        "issue": "detectLegacyDatabase relies solely on the .sqlcipher marker file. Fresh encrypted databases created via GRDBMemoryStore.make/GRDBAuditLog.make never get a marker, so they are misdetected as legacy plaintext; a future auto-migration pass would try to open an encrypted DB without a key and fail.",
+        "remediation": "Write the marker in make() when useSQLCipher is true, and/or strengthen detection by checking for the 'SQLite format 3\\0' file header instead of relying only on a sidecar marker."
+      },
+      {
+        "finding_id": "i25-sr-005",
+        "severity": "important",
+        "rule_ref": "sdl.review.security",
+        "affected_ref": "Council/Sources/CouncilMemory/GRDBMemoryStore.swift",
+        "issue": "The same HKDF output (info com.council.memory.database.v1) is used both as the SQLCipher raw page key and as the column-level AES-256-GCM key. No plaintext leak, but key separation between the two layers is lost.",
+        "remediation": "Derive a distinct subkey for the SQLCipher layer (e.g. info com.council.memory.sqlcipher.v1) so page-level and column-level keys are independent."
+      },
+      {
+        "finding_id": "i25-sr-006",
+        "severity": "info",
+        "rule_ref": "sdl.review.migration",
+        "affected_ref": "Council/Sources/CouncilMemory/SQLCipherMigration.swift",
+        "issue": "Migration swap/rollback does not handle -wal/-shm sidecar files; a stale plaintext WAL next to the target path would be replayed into the freshly swapped encrypted database. Low risk with DatabaseQueue (non-WAL default) but a real corruption vector after crashes.",
+        "remediation": "Checkpoint and delete sidecar files for legacyPath before the swap, and for path during rollback."
+      },
+      {
+        "finding_id": "i25-sr-007",
+        "severity": "info",
+        "rule_ref": "sdl.review.migration",
+        "affected_ref": "Council/Sources/CouncilMemory/SQLCipherMigration.swift",
+        "issue": "migrate(legacyPath:profileKey:salt:) requires the caller to pass the same salt persisted in salt.bin; any other salt yields an encrypted DB that make() cannot reopen (it resolves salt.bin). Precondition is undocumented and migrate does not resolve/persist the salt itself. Also no post-swap verification open.",
+        "remediation": "Resolve the salt from salt.bin inside migrate (or document the precondition), and open the migrated DB once after the swap to verify it decrypts before returning success."
+      },
+      {
+        "finding_id": "i25-sr-008",
+        "severity": "info",
+        "rule_ref": "sdl.review.test-coverage",
+        "affected_ref": "Council/Tests/CouncilMemoryTests/SQLCipherMigrationTests.swift",
+        "issue": "11 meaningful tests cover detection, key-less denial, correct-key round-trip, in-memory mode, migration data preservation (including encrypted column payloads and audit chain), rollback, and marker contents. Gaps: no wrong-key denial test, no marker-less-encrypted-DB detection test, no multi-record/audit-ordering migration test. Docs claim 12 tests.",
+        "remediation": "Add the missing negative tests; fix the test count in the commit message/ADR (11, not 12)."
+      },
+      {
+        "finding_id": "i25-sr-009",
+        "severity": "info",
+        "rule_ref": "sdl.review.security",
+        "affected_ref": "Council/Sources/CouncilMemory/SQLCipherMigration.swift",
+        "issue": "Migration intentionally retains a plaintext .pre-sqlcipher-backup after success. Documented and required for rollback, but plaintext at rest persists until an operator deletes it.",
+        "remediation": "Document operator guidance to delete the backup after validating the migrated store, or add a cleanup command/flag."
+      },
+      {
+        "finding_id": "i25-sr-010",
+        "severity": "info",
+        "rule_ref": "sdl.review.governance",
+        "affected_ref": "planning/adr-025-sqlcipher-migration.md",
+        "issue": "ADR header still references lifecycle record 6171148c-c5fd-4d38-bd99-786de23866ac while the implementation commit and routing attestation use b7b5b906-8db1-4eb8-a759-cece3da2a7b2. ADR status change Proposed to Accepted is otherwise justified by the implementation.",
+        "remediation": "Update the ADR lifecycle record reference."
+      },
+      {
+        "finding_id": "i25-sr-011",
+        "severity": "info",
+        "rule_ref": "sdl.review.governance",
+        "affected_ref": ".github/workflows (sdl-governance)",
+        "issue": "sdl-governance CI fails on every branch because .stibdedlom/bin is a git submodule that CI does not initialize (missing validate-schemas.py). Governance gate is red repo-wide.",
+        "remediation": "Initialize submodules in the workflow checkout or vendor the validation scripts. Pre-existing; not introduced by this PR."
+      }
+    ],
+    "positive_notes": [
+      "PRAGMA key application order is correct: file-based stores apply the raw key inside Configuration.prepareDatabase before GRDB runs any SQL; in-memory stores key via writeWithoutTransaction before migrations.",
+      "Raw-key mode (x'<64-hex>') preserves the HKDF hierarchy with no extra PBKDF2; key is hex-only so the SQL interpolation carries no injection risk.",
+      "Shared in-memory queue handling (hasExistingTables) correctly prevents double-keying when GRDBMemoryStore is constructed before GRDBAuditLog.",
+      "Migration copy preserves UUID primary keys and copies audit previousHash/hmac verbatim; audit chain integrity verified by tests; rollback restores a readable plaintext database.",
+      "No plaintext leaks in the migration temp path: .next is encrypted from its first page; swap is two moveItem operations with restore-on-failure.",
+      "Commit trailers are correct and complete; --no-verify usage is disclosed transparently in the commit body with the manual validation record."
+    ]
+  },
+  "timestamp": "2026-07-16T04:55:00+00:00"
+}

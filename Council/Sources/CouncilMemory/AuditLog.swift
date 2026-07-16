@@ -4,25 +4,80 @@ import Foundation
 import GRDB
 
 /// `AuditLog` implementation backed by GRDB with an HMAC-SHA256 chain.
+///
+/// When built against the SQLCipher fork of GRDB, the entire database file is
+/// encrypted at the page level (full-database encryption).
 public actor GRDBAuditLog: AuditLog {
     let dbQueue: DatabaseQueue
     private let hmacKey: SymmetricKey
 
-    public init(dbQueue: DatabaseQueue, profileKey: Data) throws {
+    /// Creates an audit log.
+    ///
+    /// - Parameters:
+    ///   - dbQueue: The GRDB database queue.
+    ///   - profileKey: The profile key from which the audit HMAC key is derived.
+    ///   - salt: Optional 16-byte salt used to derive the SQLCipher database key. When
+    ///     `useSQLCipher` is `true` the salt is resolved the same way as `GRDBMemoryStore`.
+    ///   - useSQLCipher: When `true` (default), apply the SQLCipher key so the audit database
+    ///     file is encrypted at the page level. For file-based databases, the queue should be
+    ///     created with `GRDBMemoryStore.sqlCipherConfiguration(key:)`. The `PRAGMA key` path
+    ///     here is only effective for in-memory databases.
+    public init(dbQueue: DatabaseQueue, profileKey: Data, salt: Data? = nil, useSQLCipher: Bool = true) throws {
         self.dbQueue = dbQueue
         self.hmacKey = Self.deriveAuditKey(from: profileKey)
+        if useSQLCipher {
+            let path = dbQueue.path
+            if path.isEmpty || path == ":memory:" {
+                if let salt, salt.count == 16 {
+                    // Explicit salt provided — safe to apply the key.
+                    let databaseKey = GRDBMemoryStore.deriveDatabaseKey(from: profileKey, salt: salt)
+                    try GRDBMemoryStore.applySQLCipherKey(dbQueue: dbQueue, key: databaseKey)
+                } else if !Self.hasExistingTables(dbQueue) {
+                    // No tables yet — fresh database, safe to apply key with ephemeral salt.
+                    let resolvedSalt = try GRDBMemoryStore.resolveSalt(dbQueue: dbQueue, injectedSalt: salt)
+                    let databaseKey = GRDBMemoryStore.deriveDatabaseKey(from: profileKey, salt: resolvedSalt)
+                    try GRDBMemoryStore.applySQLCipherKey(dbQueue: dbQueue, key: databaseKey)
+                }
+                // else: database already has tables (shared queue with GRDBMemoryStore) — skip.
+            }
+            // File-based queues must be created with sqlCipherConfiguration(key:) — see make(path:).
+        }
         try DatabaseMigrator.migrator().migrate(dbQueue)
     }
 
+    /// Returns `true` if the database already has user tables, indicating it has been set up
+    /// (and possibly already keyed by a shared `GRDBMemoryStore` on the same queue).
+    private static func hasExistingTables(_ dbQueue: DatabaseQueue) -> Bool {
+        let count = (try? dbQueue.read { db in
+            try Int.fetchOne(db, sql: """
+                SELECT COUNT(*) FROM sqlite_master
+                WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'grdb_migrations'
+                """) ?? 0
+        }) ?? 0
+        return count > 0
+    }
+
     /// Creates an audit log at the given file path.
-    public static func make(path: String, profileKey: Data) async throws -> GRDBAuditLog {
+    ///
+    /// When `useSQLCipher` is `true` (default), the database is opened with
+    /// `Configuration.prepareDatabase` that applies `PRAGMA key` before any other SQL runs.
+    public static func make(path: String, profileKey: Data, salt: Data? = nil, useSQLCipher: Bool = true) async throws -> GRDBAuditLog {
         let url = URL(fileURLWithPath: path)
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let dbQueue = try DatabaseQueue(path: path)
-        return try GRDBAuditLog(dbQueue: dbQueue, profileKey: profileKey)
+        let resolvedSalt = try GRDBMemoryStore.resolveSalt(forPath: path, injectedSalt: salt)
+        let databaseKey = GRDBMemoryStore.deriveDatabaseKey(from: profileKey, salt: resolvedSalt)
+        let dbQueue: DatabaseQueue
+        if useSQLCipher {
+            let config = GRDBMemoryStore.sqlCipherConfiguration(key: databaseKey)
+            dbQueue = try DatabaseQueue(path: path, configuration: config)
+        } else {
+            dbQueue = try DatabaseQueue(path: path)
+        }
+        // Key already applied via prepareDatabase; pass useSQLCipher: false to skip re-applying.
+        return try GRDBAuditLog(dbQueue: dbQueue, profileKey: profileKey, salt: resolvedSalt, useSQLCipher: false)
     }
 
     public func append(_ entry: AuditEntry) async throws {
