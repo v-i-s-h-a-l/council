@@ -56,6 +56,8 @@ COUNCIL_RUN_BENCHMARKS=1 swift test --filter CouncilBenchmarks
 > Note: MLX Metal inference requires a physical device or macOS host. The benchmark target skips automatically in the iOS Simulator and when `COUNCIL_RUN_BENCHMARKS` is unset.
 
 > Build note (issue #16): upstream `mlx-swift` v0.31.5 fails to compile for iOS Simulator because its `encuda` executable target uses `Process` (macOS/Linux-only API). `Council/Package.swift` therefore points at a local fork (`/Users/vishalsingh/Documents/v-i-s-h-a-l/github/mlx-swift`, tag `0.31.5-council.1`) that guards the `Process` usage with `#if os(macOS) || os(Linux)`. To build CouncilApp, clone that fork (mlx-swift v0.31.5 + `encuda` platform guards, submodules initialized) at the referenced path, then `xcodebuild -scheme CouncilApp` succeeds for both `platform=macOS` and `platform=iOS Simulator`. Revert to the upstream URL once ml-explore/mlx-swift fixes the `encuda` target for iOS destinations.
+>
+> **Caveat:** SwiftPM currently resolves the identity conflict between the local path fork and `mlx-swift-lm`'s remote `mlx-swift` dependency in favor of the local path, but warns this becomes an error in a future SwiftPM version. The local fork is therefore time-boxed — upstream the `encuda` guards and revert to the URL dependency before that SwiftPM release ships.
 
 ## Phase 2: Expanded Memory and Profile
 - Expand profile ingestion: values, goals, boundaries, and basic journal ingestion.
