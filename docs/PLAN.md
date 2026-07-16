@@ -60,9 +60,9 @@ COUNCIL_RUN_BENCHMARKS=1 swift test --filter CouncilBenchmarks
 > **Caveat:** SwiftPM currently resolves the identity conflict between the local path fork and `mlx-swift-lm`'s remote `mlx-swift` dependency in favor of the local path, but warns this becomes an error in a future SwiftPM version. The local fork is therefore time-boxed — upstream the `encuda` guards and revert to the URL dependency before that SwiftPM release ships.
 
 ## Phase 2: Expanded Memory and Profile
-- Expand profile ingestion: values, goals, boundaries, and basic journal ingestion.
-- SQLCipher full-database encryption (implemented via forked GRDB + SQLCipher.swift; see ADR-025).
-- Refine purpose-bound access control for richer profile data.
+- ✅ Expand profile ingestion: values, goals, boundaries, and basic journal ingestion. (Done — PR #28, #29)
+- ✅ SQLCipher full-database encryption. (Done — PR #31, ADR-025 Accepted)
+- ✅ Refine purpose-bound access control for richer profile data. (Done — PR #29, ADR-026 Accepted)
 
 ## Phase 3: Secretary Layer
 

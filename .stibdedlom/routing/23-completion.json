@@ -1,9 +1,9 @@
 {
   "schema_version": "sdl-routing-attestation@2",
-  "issue": 16,
-  "chain_id": "issue-16",
-  "node_id": "c77412a0-ae2e-4802-814f-d8f6f4eaa681",
-  "goal": "Phase 2 expanded memory and profile — profile ingestion",
+  "issue": 23,
+  "chain_id": "issue-23-completion",
+  "node_id": "e0e48a68-97fa-4e81-91ac-44137f3cd3ed",
+  "goal": "Phase 2 completion — documentation and verification for issue #23",
   "capability": "capability-apple-native-development",
   "status": "approved",
   "allowed_paths": [
@@ -24,12 +24,12 @@
   "created_at": "2026-07-15T09:19:27.000000+00:00",
   "expires_at": "2026-07-22T09:19:27.000000+00:00",
   "runtime_binding": {
-    "branch": "sdl/issue-16",
+    "branch": "sdl/issue-23-phase-2-completion",
     "worktree_path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council-worktrees/phase2",
     "base_ref": "main",
     "max_commits_ahead": 50
   },
-  "lifecycle_record_id": "c77412a0-ae2e-4802-814f-d8f6f4eaa681",
+  "lifecycle_record_id": "e0e48a68-97fa-4e81-91ac-44137f3cd3ed",
   "max_commits_ahead": 50,
   "algorithm": "hmac-sha256",
   "kid": "legacy-hmac"
