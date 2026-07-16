@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Client commit-msg hook for SDL governance.
+# Receives the commit message file as $1 and validates SDL trailers.
+# Path/attestation validation was already done at pre-commit time.
+
+set -euo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# Absolutize $1 defensively (unusual GIT_DIR/cwd invocations).
+MSG_FILE=$1
+case "$MSG_FILE" in
+    /*) ;;
+    *) MSG_FILE="$REPO_ROOT/$MSG_FILE" ;;
+esac
+
+python3 "$REPO_ROOT/.stibdedlom/bin/validate-commit.py" \
+    --repo-root "$REPO_ROOT" \
+    --staged \
+    --commit-msg-file "$MSG_FILE"

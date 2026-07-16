@@ -75,5 +75,12 @@ record manually via `scripts/lifecycle/new-record.sh` in the infra repo.
 - Live mutations require explicit bounded authorization.
 - Commits that change governed files must carry `SDL-Commit-Author` and
   `SDL-Routing-Attestation` trailers.
-- Merges require independent review and merge-queue submission.
+- Merges go through the SDL merge queue. For merge-queue submissions, the
+  authorization hierarchy is: derived tier < 2 merges on a fresh sibling-agent
+  review of the exact merge tree, commissioned by the queue gate itself with
+  distinct identity; derived tier >= 2 additionally requires human sign-off
+  via a `HUMAN_APPROVED` PR comment from an allowlisted handle. Tiers derive
+  from the PR diff via lib.sh `lc_path_tier` — the single source of truth for
+  path tiers (unknown paths fail closed to tier 2). Out-of-band merges bypass
+  the gate and are flagged by audit.
 - Promotion and provider dispatch follow the SDL lifecycle gates.

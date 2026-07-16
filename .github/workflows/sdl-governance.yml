@@ -27,6 +27,81 @@ jobs:
       - name: Install Python dependencies
         run: python3 -m pip install --user "pyyaml>=6.0"
 
+      - name: Resolve SDL surface pin
+        # Symlinked clients carry .stibdedlom/{bin,lib,invocation-policy.yaml}
+        # as absolute symlinks into the maintainer's infra checkout, which
+        # dangle on hosted runners. Resolve the pinned infra ref (validated:
+        # 40-hex SHA or conservative ref name, else 'main') for the
+        # materialization steps below. The pin is PR-editable, so it is
+        # regex-validated here and only ever reaches actions/checkout's ref
+        # parameter — never a shell command.
+        id: sdl-pin
+        env:
+          SDL_INFRA_READ_TOKEN: ${{ secrets.SDL_INFRA_READ_TOKEN }}
+        run: |
+          SYMLINKED=false
+          for p in bin lib invocation-policy.yaml; do
+            [ -L ".stibdedlom/$p" ] && SYMLINKED=true
+          done
+          echo "symlinked=$SYMLINKED" >> "$GITHUB_OUTPUT"
+          if [ "$SYMLINKED" = "true" ] && [ -z "${SDL_INFRA_READ_TOKEN:-}" ]; then
+            echo "::error::SDL surface is symlinked but secret SDL_INFRA_READ_TOKEN is not set (fine-grained PAT, contents:read on stibdedlom/infra)."
+            exit 1
+          fi
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import re, sys, yaml
+          pin = "main"
+          try:
+              data = yaml.safe_load(open(".stibdedlom/manifest.yaml"))
+              raw = str((data or {}).get("infra_commit_ref") or "").strip()
+              if re.fullmatch(r"[0-9a-f]{40}", raw):
+                  pin = raw
+              elif (re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", raw)
+                    and ".." not in raw and "@{" not in raw):
+                  pin = raw
+          except FileNotFoundError:
+              pass
+          except Exception as exc:
+              # Warn on stderr: stdout is redirected wholesale into
+              # $GITHUB_OUTPUT, whose parser rejects non key=value lines.
+              detail = str(exc).replace("\r", " ").replace("\n", " ").lstrip(":")
+              print(f"::warning::could not parse .stibdedlom/manifest.yaml ({detail}); using pin=main", file=sys.stderr)
+          if pin == "unknown":
+              # Legacy installs from non-git infra checkouts wrote this
+              # literal; it is not a fetchable ref, so float to main.
+              pin = "main"
+          print(f"pin={pin}")
+          EOF
+
+      - name: Checkout SDL infra surface
+        if: steps.sdl-pin.outputs.symlinked == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: stibdedlom/infra
+          ref: ${{ steps.sdl-pin.outputs.pin }}
+          token: ${{ secrets.SDL_INFRA_READ_TOKEN }}
+          path: .sdl-infra-surface
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Materialize SDL surface (symlinked clients)
+        # Replace the dangling symlinks with real copies from the pinned infra
+        # checkout so the validate-* steps below can execute. rm -f on a
+        # symlink removes only the link, never the target; cp -R preserves
+        # exec bits. Handled per-path to tolerate mixed (partial) states.
+        if: steps.sdl-pin.outputs.symlinked == 'true'
+        run: |
+          set -euo pipefail
+          SRC=.sdl-infra-surface/templates/client-onboarding/sdl
+          [ -d "$SRC" ] || { echo "::error::infra surface checkout missing or incomplete: $SRC"; exit 1; }
+          for p in bin lib invocation-policy.yaml; do
+            if [ -L ".stibdedlom/$p" ]; then
+              rm -f -- ".stibdedlom/$p"
+              cp -R "$SRC/$p" ".stibdedlom/$p"
+              echo "materialized .stibdedlom/$p"
+            fi
+          done
+
       - name: Validate SDL manifest and policy schemas
         run: |
           python3 .stibdedlom/bin/validate-schemas.py --repo-root "$PWD"
@@ -45,6 +120,14 @@ jobs:
             --repo-root "$PWD"
 
       - name: Re-run pre-commit checks on HEAD
+        # Only meaningful on a branch push, where HEAD is the tip commit. On a
+        # pull_request merge-preview checkout, HEAD~1 is the base branch so
+        # per-commit checks against HEAD~1..HEAD span the whole PR and are
+        # nonsensical; the push-event run validates the tip and the validate-push
+        # step below covers the base..head range.
+        # Skipped on protected branches: tip commits there arrive via merge, and
+        # validate-commit's protected-branch guard would hard-fail regardless.
+        if: github.event_name == 'push' && github.ref_name != 'main' && github.ref_name != 'master' && !startsWith(github.ref_name, 'release/')
         run: |
           COMMIT_MSG=$(git log -1 --format=%B)
           python3 .stibdedlom/bin/validate-commit.py \
@@ -52,9 +135,56 @@ jobs:
             --commit-msg-text "$COMMIT_MSG"
 
       - name: Re-run pre-push checks
+        # Skipped on protected branches: validate-push refuses protected remote
+        # refs by design. Gating on the default branch relies on server-side
+        # branch protection requiring this workflow on PRs; the audit step below
+        # keeps a non-blocking detective signal for unrouted commits on main.
+        # Prerequisite: fetch-depth: 0 keeps origin/main available for the
+        # merge-base and the ancestry-based legacy exemption.
+        if: github.ref_name != 'main' && github.ref_name != 'master' && !startsWith(github.ref_name, 'release/')
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
         run: |
+          BASE="${EVENT_BEFORE:-}"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE=$(git merge-base origin/main HEAD || true)
+          fi
+          if [ -z "$BASE" ]; then
+            BASE_ARG="0000000000000000000000000000000000000000"
+          else
+            BASE_ARG="$BASE"
+          fi
           python3 .stibdedlom/bin/validate-push.py \
             --repo-root "$PWD" \
-            --base "origin/main" \
+            --base "$BASE_ARG" \
             --head "HEAD" \
-            --remote-ref "refs/heads/${{ github.ref_name }}"
+            --remote-ref "refs/heads/$REF_NAME"
+
+      - name: Audit unrouted commits on default branch (non-blocking)
+        # Detective signal only: on protected-branch pushes the gate above is
+        # skipped, so this logs (never fails on) any unrouted commit that
+        # reached the default branch without passing a PR gate. Uses the
+        # pre-push tip (EVENT_BEFORE) as base — after actions/checkout,
+        # origin/main already points at HEAD, so a merge-base range would be
+        # empty — and disables the legacy exemption, which would otherwise
+        # skip every commit in the range (all are origin/main ancestors now).
+        if: github.ref_name == 'main' || github.ref_name == 'master' || startsWith(github.ref_name, 'release/')
+        continue-on-error: true
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          BASE="${EVENT_BEFORE:-}"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE=$(git merge-base origin/main HEAD || true)
+          fi
+          if [ -z "$BASE" ]; then
+            echo "No base resolvable; skipping audit."
+            exit 0
+          fi
+          python3 .stibdedlom/bin/validate-push.py \
+            --repo-root "$PWD" \
+            --base "$BASE" \
+            --head "HEAD" \
+            --no-legacy-exemption || echo "::warning::Unrouted or legacy commits detected on $REF_NAME (audit only, non-blocking)."
