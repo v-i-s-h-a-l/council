@@ -19,6 +19,11 @@ public struct ModelManifest: Sendable, Codable, Identifiable {
 /// Both the manifest registry and consent are persisted in `UserDefaults` under a
 /// dedicated suite key prefix so they survive process restarts and are isolated
 /// from other app settings.
+///
+/// The registry is loaded once at init and written through on mutation. A single
+/// long-lived instance per suite is expected (see `RuntimeAssembly`); concurrent
+/// instances over the same suite would see stale snapshots and overwrite each
+/// other last-writer-wins.
 public actor ModelManifestService {
     private let defaults: UserDefaults
     private let suiteKey: String

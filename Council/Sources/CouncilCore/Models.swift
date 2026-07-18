@@ -358,6 +358,10 @@ public struct RoutableProfileContext: Codable, Sendable {
         self.boundaries = boundaries
     }
 
+    /// Unfiltered initializer: copies ALL values, goals, and boundaries without
+    /// evaluating `accessScope`/`deniedPurposes`. Intended for user-inspection paths
+    /// (e.g. `council profile show`), never for building agent context — use
+    /// `ProfileService.routableContext(purposes:)` for that.
     public init(profile: UserProfile) {
         self.values = profile.values
         self.goals = profile.goals
@@ -367,7 +371,7 @@ public struct RoutableProfileContext: Codable, Sendable {
 
 // MARK: - Memory
 
-public enum AccessPurpose: String, Codable, Sendable {
+public enum AccessPurpose: String, Codable, Sendable, CaseIterable {
     case purchaseDeliberation
     case travelDeliberation
     case lifeDeliberation

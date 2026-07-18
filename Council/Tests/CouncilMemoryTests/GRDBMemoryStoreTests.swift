@@ -250,6 +250,27 @@ struct GRDBMemoryStoreTests {
         }
         #expect(!columnsBefore.contains("deniedPurposesJSON"))
 
+        // Insert a v2-era episode row (no deniedPurposesJSON column) so the migration
+        // must backfill the default for existing data.
+        let databaseKey = GRDBMemoryStore.deriveDatabaseKey(from: rawKey, salt: salt)
+        let summaryBlob = try FieldEncryption.encrypt(plaintext: Data("legacy".utf8), key: databaseKey)
+        let emptyListBlob = try FieldEncryption.encrypt(plaintext: Data("[]".utf8), key: databaseKey)
+        let legacyEpisodeID = UUID()
+        try await dbQueue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO episodic_gists
+                (id, sessionID, question, createdAt, isLocked,
+                 summaryEncrypted, tradeOffsEncrypted, blindSpotsEncrypted, dissentEncrypted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                arguments: [
+                    legacyEpisodeID, UUID(), "Legacy question?", Date(timeIntervalSince1970: 1_700_000_000), false,
+                    summaryBlob, emptyListBlob, emptyListBlob, emptyListBlob,
+                ]
+            )
+        }
+
         // Opening the store applies v3.
         let store = try GRDBMemoryStore(
             dbQueue: dbQueue,
@@ -262,6 +283,12 @@ struct GRDBMemoryStoreTests {
         }
         #expect(columnsAfter.contains("deniedPurposesJSON"))
 
+        // The pre-v3 row reads back with an empty deny set.
+        let legacy = try await store.episodes(matching: MemoryFilter())
+        #expect(legacy.count == 1)
+        #expect(legacy.first?.perspective.summary == "legacy")
+        #expect(legacy.first?.deniedPurposes == [])
+
         // The store is fully functional on the migrated schema.
         let episode = EpisodicGist(
             sessionID: UUID(),
@@ -270,7 +297,33 @@ struct GRDBMemoryStoreTests {
         )
         try await store.saveEpisode(episode)
         let loaded = try await store.episodes(matching: MemoryFilter())
-        #expect(loaded.first?.deniedPurposes == [.travelDeliberation])
+        #expect(loaded.first { $0.id == episode.id }?.deniedPurposes == [.travelDeliberation])
+    }
+
+    @Test func corruptDeniedPurposesPayloadFailsClosed() async throws {
+        let store = try makeStore()
+        let episode = EpisodicGist(
+            sessionID: UUID(),
+            question: "Corrupt me?",
+            deniedPurposes: [.purchaseDeliberation]
+        )
+        try await store.saveEpisode(episode)
+
+        // Simulate store corruption: the deny-set JSON no longer parses.
+        try await store.dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE episodic_gists SET deniedPurposesJSON = 'not-json' WHERE id = ?",
+                arguments: [episode.id]
+            )
+        }
+
+        // The episode decodes as denied for every purpose rather than routable.
+        let all = try await store.episodes(matching: MemoryFilter())
+        #expect(all.first?.deniedPurposes == AccessPurpose.allCases)
+        for purpose in AccessPurpose.allCases {
+            let filtered = try await store.episodes(matching: MemoryFilter(purposes: [purpose]))
+            #expect(filtered.isEmpty)
+        }
     }
 
     @Test func differentSaltsProduceDifferentCiphertexts() async throws {

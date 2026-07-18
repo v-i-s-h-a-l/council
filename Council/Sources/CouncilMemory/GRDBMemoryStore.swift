@@ -346,8 +346,15 @@ extension EpisodicGistRecord {
         let tradeOffs = try decoder.decode([String].self, from: try FieldEncryption.decrypt(ciphertext: tradeOffsEncrypted, key: key))
         let blindSpots = try decoder.decode([String].self, from: try FieldEncryption.decrypt(ciphertext: blindSpotsEncrypted, key: key))
         let dissent = try decoder.decode([String].self, from: try FieldEncryption.decrypt(ciphertext: dissentEncrypted, key: key))
-        // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v3 migration); tolerate absence defensively.
-        let deniedPurposes = (try? decoder.decode([AccessPurpose].self, from: Data(deniedPurposesJSON.utf8))) ?? []
+        // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v3 migration); tolerate that default,
+        // but fail CLOSED on a corrupt non-default payload so a damaged deny set can never
+        // silently become routable.
+        let deniedPurposes: [AccessPurpose]
+        if let decoded = try? decoder.decode([AccessPurpose].self, from: Data(deniedPurposesJSON.utf8)) {
+            deniedPurposes = decoded
+        } else {
+            deniedPurposes = deniedPurposesJSON == "[]" ? [] : AccessPurpose.allCases
+        }
 
         return EpisodicGist(
             id: id,
@@ -388,8 +395,15 @@ extension TemporalFactRecord {
         let objectData = try FieldEncryption.decrypt(ciphertext: objectEncrypted, key: key)
         let object = String(data: objectData, encoding: .utf8) ?? ""
         let accessScope = try decoder.decode([AccessPurpose].self, from: Data(accessScopeJSON.utf8))
-        // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v2 migration); tolerate absence defensively.
-        let deniedPurposes = (try? decoder.decode([AccessPurpose].self, from: Data(deniedPurposesJSON.utf8))) ?? []
+        // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v2 migration); tolerate that default,
+        // but fail CLOSED on a corrupt non-default payload so a damaged deny set can never
+        // silently become routable.
+        let deniedPurposes: [AccessPurpose]
+        if let decoded = try? decoder.decode([AccessPurpose].self, from: Data(deniedPurposesJSON.utf8)) {
+            deniedPurposes = decoded
+        } else {
+            deniedPurposes = deniedPurposesJSON == "[]" ? [] : AccessPurpose.allCases
+        }
 
         return TemporalFact(
             id: id,

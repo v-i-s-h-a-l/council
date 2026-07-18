@@ -29,6 +29,25 @@ struct ModelsTests {
         // Confidential containers are intentionally not present.
     }
 
+    @Test func legacyProfileItemsDecodeWithDefaultPBACScope() async throws {
+        // Values persisted before PBAC fields existed omit accessScope/deniedPurposes;
+        // they must decode to the full deliberation scope with no denials.
+        let legacyJSON = """
+        {"id": "00000000-0000-0000-0000-000000000001", "text": "Be frugal"}
+        """
+        let value = try JSONDecoder().decode(ValueStatement.self, from: Data(legacyJSON.utf8))
+        #expect(value.accessScope == AccessPurpose.allDeliberation)
+        #expect(value.deniedPurposes.isEmpty)
+
+        let goal = try JSONDecoder().decode(Goal.self, from: Data(legacyJSON.utf8))
+        #expect(goal.accessScope == AccessPurpose.allDeliberation)
+        #expect(goal.deniedPurposes.isEmpty)
+
+        let boundary = try JSONDecoder().decode(Boundary.self, from: Data(legacyJSON.utf8))
+        #expect(boundary.accessScope == AccessPurpose.allDeliberation)
+        #expect(boundary.deniedPurposes.isEmpty)
+    }
+
     @Test func modelRoutingPolicyDefaultsToOnDevice() async throws {
         let decision = ModelRoutingPolicy.defaultOnDeviceDecision()
         #expect(decision.selectedRoute == .onDeviceApple)
