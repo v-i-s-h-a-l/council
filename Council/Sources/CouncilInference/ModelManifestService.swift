@@ -16,26 +16,42 @@ public struct ModelManifest: Sendable, Codable, Identifiable {
 /// Service that tracks available models, their checksums/signatures, and the
 /// user's download consent.
 ///
-/// Consent is persisted in `UserDefaults` under a dedicated suite key prefix so
-/// it is isolated from other app settings.
+/// Both the manifest registry and consent are persisted in `UserDefaults` under a
+/// dedicated suite key prefix so they survive process restarts and are isolated
+/// from other app settings.
 public actor ModelManifestService {
     private let defaults: UserDefaults
     private let suiteKey: String
     private let consentKeyPrefix: String
-    private var manifests: [String: ModelManifest] = [:]
+    private let manifestsKey: String
+    private var manifests: [String: ModelManifest]
 
     public init(
         defaults: UserDefaults = .standard,
         suiteKey: String = "com.council.modelManifest"
     ) {
+        // Resolve keys and persisted state via locals so the initializer stays
+        // nonisolated; callers may pass a non-Sendable UserDefaults across
+        // isolation domains.
+        let manifestsKey = "\(suiteKey).manifests"
+        let persisted: [String: ModelManifest]
+        if let data = defaults.data(forKey: manifestsKey),
+           let decoded = try? JSONDecoder().decode([String: ModelManifest].self, from: data) {
+            persisted = decoded
+        } else {
+            persisted = [:]
+        }
         self.defaults = defaults
         self.suiteKey = suiteKey
         self.consentKeyPrefix = "\(suiteKey).consent."
+        self.manifestsKey = manifestsKey
+        self.manifests = persisted
     }
 
     /// Registers a model manifest.
     public func register(_ manifest: ModelManifest) {
         manifests[manifest.id] = manifest
+        persistManifests()
     }
 
     /// Returns whether the user has granted download consent for a model.
@@ -76,10 +92,16 @@ public actor ModelManifestService {
     /// Removes a manifest from the registry.
     public func unregister(id: String) {
         manifests.removeValue(forKey: id)
+        persistManifests()
     }
 
     /// Validates a candidate checksum against the registered manifest.
     public func validateChecksum(id: String, against value: String) -> Bool {
         checksum(for: id) == value
+    }
+
+    private func persistManifests() {
+        guard let data = try? JSONEncoder().encode(manifests) else { return }
+        defaults.set(data, forKey: manifestsKey)
     }
 }

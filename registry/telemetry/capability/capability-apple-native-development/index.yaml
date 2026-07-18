@@ -1,3 +1,17 @@
+- event_id: ci-cbe5c030-90e1-4696-9f05-d720ae5746b2
+  timestamp: '2026-07-18T19:49:21Z'
+  capability_id: capability-apple-native-development
+  task_ref: issue-36
+  outcome: routed
+  accepted: true
+  path: registry/telemetry/capability/capability-apple-native-development/2026-07-18T19-49-21Z_ci-cbe5c030-90e1-4696-9f05-d720ae5746b2.yaml
+- event_id: ci-bca08d3f-f631-4b24-bd29-c52acf2b1270
+  timestamp: '2026-07-18T19:48:19Z'
+  capability_id: capability-apple-native-development
+  task_ref: issue-36
+  outcome: routed
+  accepted: true
+  path: registry/telemetry/capability/capability-apple-native-development/2026-07-18T19-48-19Z_ci-bca08d3f-f631-4b24-bd29-c52acf2b1270.yaml
 - event_id: ci-ca065003-283e-4fe9-bf9c-88032e21c29f
   timestamp: '2026-07-09T20:47:02Z'
   capability_id: capability-apple-native-development

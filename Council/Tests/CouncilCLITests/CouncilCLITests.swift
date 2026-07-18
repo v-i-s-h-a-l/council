@@ -532,12 +532,18 @@ struct CouncilCLITests {
         let travel = try await service.facts(subject: "user", purposes: [.travelDeliberation])
         #expect(travel.count == 1)
 
-        // Each purpose-filtered read records one purpose-bound access decision.
+        // Each purpose-filtered read records an aggregate allow entry plus one
+        // per-item entry for every denied fact.
         let allAudit = await auditLog.entries
         let accessEntries = allAudit.filter { $0.category == .memoryAccess }
-        #expect(accessEntries.count == 2)
+        #expect(accessEntries.count == 3)
         #expect(accessEntries.allSatisfy { $0.payload["dataElementType"] == "TemporalFact" })
-        #expect(accessEntries.allSatisfy { $0.payload["decision"] == "allowed" })
+        let allowedEntries = accessEntries.filter { $0.payload["decision"] == "allowed" }
+        let deniedEntries = accessEntries.filter { $0.payload["decision"] == "denied" }
+        #expect(allowedEntries.count == 2)
+        #expect(deniedEntries.count == 1)
+        #expect(deniedEntries.first?.payload["purpose"] == "purchaseDeliberation")
+        #expect(deniedEntries.first?.payload["elementID"] != nil)
     }
 
     @Test("ProfileService routableContext excludes journal entries")
@@ -553,5 +559,73 @@ struct CouncilCLITests {
         // RoutableProfileContext has no journal field by construction; the profile still holds it.
         let profile = try await service.load()
         #expect(profile.journalEntries.count == 1)
+    }
+
+    @Test("ProfileService routableContext narrows items by purpose")
+    func profileServiceRoutableContextNarrowsByPurpose() async throws {
+        let vault = MockProfileVault()
+        let service = ProfileService(vault: vault)
+        try await service.addValue("Be frugal")
+        try await service.addValue("Travel light", accessScope: [.travelDeliberation])
+        try await service.addGoal("Save for trips", deniedPurposes: [.purchaseDeliberation])
+        try await service.addBoundary("No impulse buys")
+
+        let purchase = try await service.routableContext(purposes: [.purchaseDeliberation])
+        // Only the default-scoped value and boundary survive; the travel-scoped value is
+        // out of scope and the goal is explicitly denied.
+        #expect(purchase.values.map(\.text) == ["Be frugal"])
+        #expect(purchase.goals.isEmpty)
+        #expect(purchase.boundaries.map(\.text) == ["No impulse buys"])
+
+        let travel = try await service.routableContext(purposes: [.travelDeliberation])
+        #expect(travel.values.count == 2)
+        #expect(travel.goals.count == 1)
+        #expect(travel.boundaries.count == 1)
+    }
+
+    @Test("ProfileService profileAccessDecision reports per-item denials")
+    func profileAccessDecisionReportsDenials() async throws {
+        let vault = MockProfileVault()
+        let service = ProfileService(vault: vault)
+        let denied = try await service.addBoundary(
+            "No work talk",
+            deniedPurposes: [.lifeDeliberation]
+        )
+        try await service.addValue("Be curious")
+
+        let decision = try await service.profileAccessDecision(purposes: [.lifeDeliberation])
+        #expect(decision.context.values.count == 1)
+        #expect(decision.context.boundaries.isEmpty)
+        #expect(decision.denials.count == 1)
+        #expect(decision.denials.first?.elementType == "Boundary")
+        #expect(decision.denials.first?.elementID == denied.id)
+        #expect(decision.denials.first?.purposes == [.lifeDeliberation])
+    }
+
+    @Test("Profile add commands parse purpose options")
+    func parsesProfilePurposeOptions() throws {
+        let value = try ProfileCommand.ValueCommand.AddCommand.parse([
+            "Be frugal",
+            "--tag", "money",
+            "--purpose", "purchaseDeliberation",
+            "--purpose", "lifeDeliberation",
+            "--denied-purpose", "travelDeliberation",
+        ])
+        #expect(value.purpose == [.purchaseDeliberation, .lifeDeliberation])
+        #expect(value.deniedPurpose == [.travelDeliberation])
+
+        let goal = try ProfileCommand.GoalCommand.AddCommand.parse([
+            "Save for travel",
+            "--denied-purpose", "purchaseDeliberation",
+        ])
+        #expect(goal.purpose.isEmpty)
+        #expect(goal.deniedPurpose == [.purchaseDeliberation])
+
+        let boundary = try ProfileCommand.BoundaryCommand.AddCommand.parse([
+            "No impulse buys",
+            "--purpose", "purchaseDeliberation",
+        ])
+        #expect(boundary.purpose == [.purchaseDeliberation])
+        #expect(boundary.deniedPurpose.isEmpty)
     }
 }

@@ -1,0 +1,32 @@
+{
+  "schema_version": "sdl-routing-attestation@2",
+  "issue": 36,
+  "chain_id": "phase-2-leftovers",
+  "node_id": "36",
+  "goal": "Phase 2 leftovers: PBAC narrowing, episodic deny-purposes, per-item audit, model manifest persistence",
+  "allowed_paths": [
+    "Council/Sources",
+    "Council/Tests",
+    "docs",
+    "planning",
+    "registry/lifecycle",
+    "registry/telemetry"
+  ],
+  "envelope_hash": "sha256:f45f0d868cb5f7c27ab2c4075ae1b337d2145cee2b84c05d9059acef4754bfd9",
+  "policy_ref": ".stibdedlom/invocation-policy.yaml",
+  "manifest_path": ".stibdedlom/manifest.yaml",
+  "base_ref": "sdl/issue-36-phase-2-leftovers",
+  "created_at": "2026-07-18T19:49:58.769038+00:00",
+  "expires_at": "2026-07-25T19:49:58.769038+00:00",
+  "kid": "rk-2026-07-09-44177cda",
+  "algorithm": "ed25519",
+  "runtime_binding": {
+    "branch": "sdl/issue-36-phase-2-leftovers",
+    "worktree_path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
+    "base_sha": "f7b31911a9764fcdeda3c2aab21da9ddc38c153c",
+    "base_ref": "sdl/issue-36-phase-2-leftovers",
+    "max_commits_ahead": 50
+  },
+  "capability": "capability-apple-native-development",
+  "signature": "ed25519:Tsbfrygh+iwgpreE//z+PBuUKi6YMZZQDaHHUdEsECTfYFCW9Cfo2FsFt6Fkbn/BxH5jHPd6U7dR4kPRcwn3Ag=="
+}

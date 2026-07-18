@@ -50,6 +50,28 @@ final class ModelManifestServiceTests: XCTestCase {
         XCTAssertFalse(invalid)
     }
 
+    func testManifestsPersistAcrossInstances() async {
+        // Unique suite key isolates this test's keys inside .standard defaults, so no
+        // non-Sendable UserDefaults instance has to cross into the actor.
+        let suiteKey = "com.council.test.\(UUID().uuidString)"
+        let manifestsKey = "\(suiteKey).manifests"
+        defer { UserDefaults.standard.removeObject(forKey: manifestsKey) }
+
+        let service = ModelManifestService(suiteKey: suiteKey)
+        await service.register(ModelManifest(id: "model-a", checksum: "sha256:abc123"))
+
+        // A fresh service instance over the same suite sees the registration.
+        let reloaded = ModelManifestService(suiteKey: suiteKey)
+        let manifest = await reloaded.manifest(id: "model-a")
+        XCTAssertEqual(manifest?.checksum, "sha256:abc123")
+
+        // Unregistering persists too.
+        await reloaded.unregister(id: "model-a")
+        let third = ModelManifestService(suiteKey: suiteKey)
+        let remaining = await third.allManifests()
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
     func testMissingChecksumReturnsNil() async {
         let service = ModelManifestService()
         let checksum = await service.checksum(for: "not-registered")

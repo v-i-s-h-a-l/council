@@ -157,15 +157,31 @@ public actor RuntimeAssembly {
         options: InferenceOptions = InferenceOptions(),
         persist: Bool = true
     ) async throws -> DeliberationService {
-        let context = try await profileService.routableContext(purposes: [.purchaseDeliberation])
+        let purposes: [AccessPurpose] = [.purchaseDeliberation]
+        let decision = try await profileService.profileAccessDecision(purposes: purposes)
+        let auditSink = persist ? self.memoryService : nil
+        if let auditSink {
+            // Record every per-item denial so users can verify what was excluded.
+            for denial in decision.denials {
+                try? await auditSink.appendAuditEntry(
+                    category: .memoryAccess,
+                    payload: [
+                        "purpose": denial.purposes.map(\.rawValue).sorted().joined(separator: ","),
+                        "dataElementType": denial.elementType,
+                        "decision": "denied",
+                        "elementID": denial.elementID.uuidString,
+                    ]
+                )
+            }
+        }
 
         return DeliberationService(
             provider: provider,
             council: PurchaseCouncil(),
             validators: [ConstitutionalPerspectiveValidator()],
-            context: context,
+            context: decision.context,
             options: options,
-            memoryService: persist ? self.memoryService : nil
+            memoryService: auditSink
         )
     }
 }

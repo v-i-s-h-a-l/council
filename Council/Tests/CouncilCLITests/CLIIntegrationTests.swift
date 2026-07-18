@@ -210,6 +210,41 @@ struct CLIIntegrationTests {
         #expect(keyPermissions?.int16Value == 0o600)
     }
 
+    @Test("Deliberation assembly logs per-item profile denials")
+    func deliberationAssemblyLogsProfileDenials() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let assembly = try await RuntimeAssembly(
+            rootDirectory: root,
+            useSecureEnclave: false
+        )
+
+        let denied = try await assembly.profileService.addGoal(
+            "Retire abroad",
+            deniedPurposes: [.purchaseDeliberation]
+        )
+        try await assembly.profileService.addValue("Be frugal")
+
+        // Building the deliberation service resolves purpose-bound profile context and
+        // records one audit entry per denied item.
+        let service = try await assembly.deliberationService(provider: EchoInferenceProvider())
+        _ = service
+
+        let entries = try await assembly.memoryService.auditLog.entries(
+            since: nil,
+            limit: nil,
+            includePayloads: true
+        )
+        let denials = entries.filter {
+            $0.category == .memoryAccess && $0.payload["decision"] == "denied"
+        }
+        #expect(denials.count == 1)
+        #expect(denials.first?.payload["dataElementType"] == "Goal")
+        #expect(denials.first?.payload["elementID"] == denied.id.uuidString)
+        #expect(denials.first?.payload["purpose"] == "purchaseDeliberation")
+    }
+
     @Test("RoutableProfileContext excludes confidential containers")
     func profileRedaction() async throws {
         let profile = UserProfile(

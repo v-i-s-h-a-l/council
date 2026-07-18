@@ -31,10 +31,17 @@ public actor ProfileService {
     @discardableResult
     public func addValue(
         _ text: String,
-        tags: [String] = []
+        tags: [String] = [],
+        accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
+        deniedPurposes: [AccessPurpose] = []
     ) async throws -> ValueStatement {
         var profile = try await load()
-        let statement = ValueStatement(text: text, tags: tags)
+        let statement = ValueStatement(
+            text: text,
+            tags: tags,
+            accessScope: accessScope,
+            deniedPurposes: deniedPurposes
+        )
         profile.values.append(statement)
         try await save(profile)
         return statement
@@ -53,10 +60,19 @@ public actor ProfileService {
         _ text: String,
         timeframe: String? = nil,
         tags: [String] = [],
-        status: GoalStatus? = nil
+        status: GoalStatus? = nil,
+        accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
+        deniedPurposes: [AccessPurpose] = []
     ) async throws -> Goal {
         var profile = try await load()
-        let goal = Goal(text: text, timeframe: timeframe, tags: tags, status: status)
+        let goal = Goal(
+            text: text,
+            timeframe: timeframe,
+            tags: tags,
+            status: status,
+            accessScope: accessScope,
+            deniedPurposes: deniedPurposes
+        )
         profile.goals.append(goal)
         try await save(profile)
         return goal
@@ -74,10 +90,18 @@ public actor ProfileService {
     public func addBoundary(
         _ text: String,
         tags: [String] = [],
-        severity: BoundarySeverity? = nil
+        severity: BoundarySeverity? = nil,
+        accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
+        deniedPurposes: [AccessPurpose] = []
     ) async throws -> Boundary {
         var profile = try await load()
-        let boundary = Boundary(text: text, tags: tags, severity: severity)
+        let boundary = Boundary(
+            text: text,
+            tags: tags,
+            severity: severity,
+            accessScope: accessScope,
+            deniedPurposes: deniedPurposes
+        )
         profile.boundaries.append(boundary)
         try await save(profile)
         return boundary
@@ -138,13 +162,70 @@ public actor ProfileService {
 
     /// Returns the profile context that is safe to route to agents for the given purposes.
     ///
-    /// Values, goals, and boundaries are inherently routable profile facts and are returned in
-    /// full. Journal entries and financial history are confidential and are NEVER included,
-    /// regardless of purpose; this is enforced by the shape of `RoutableProfileContext` itself.
-    /// The `purposes` parameter is the explicit PBAC choke point for future per-purpose
-    /// filtering and is recorded by callers as an access decision.
+    /// Values, goals, and boundaries are filtered by their PBAC labels: an item is routed
+    /// only when the request purposes intersect its `accessScope` and do not intersect its
+    /// `deniedPurposes`. Journal entries and financial history are confidential and are
+    /// NEVER included, regardless of purpose; this is enforced by the shape of
+    /// `RoutableProfileContext` itself.
     public func routableContext(purposes: [AccessPurpose]) async throws -> RoutableProfileContext {
+        try await profileAccessDecision(purposes: purposes).context
+    }
+
+    /// Returns the purpose-filtered routable context together with the per-item denials,
+    /// so callers can record each denied access decision in the audit chain.
+    public func profileAccessDecision(purposes: [AccessPurpose]) async throws -> ProfileAccessDecision {
         let profile = try await load()
-        return RoutableProfileContext(profile: profile)
+        let request = Set(purposes)
+
+        func isAllowed(_ scope: [AccessPurpose], denied: [AccessPurpose]) -> Bool {
+            !request.isDisjoint(with: Set(scope)) && request.isDisjoint(with: Set(denied))
+        }
+
+        var denials: [ProfileItemDenial] = []
+        let values = profile.values.filter { item in
+            let allowed = isAllowed(item.accessScope, denied: item.deniedPurposes)
+            if !allowed { denials.append(ProfileItemDenial(elementType: "ValueStatement", elementID: item.id, purposes: purposes)) }
+            return allowed
+        }
+        let goals = profile.goals.filter { item in
+            let allowed = isAllowed(item.accessScope, denied: item.deniedPurposes)
+            if !allowed { denials.append(ProfileItemDenial(elementType: "Goal", elementID: item.id, purposes: purposes)) }
+            return allowed
+        }
+        let boundaries = profile.boundaries.filter { item in
+            let allowed = isAllowed(item.accessScope, denied: item.deniedPurposes)
+            if !allowed { denials.append(ProfileItemDenial(elementType: "Boundary", elementID: item.id, purposes: purposes)) }
+            return allowed
+        }
+
+        return ProfileAccessDecision(
+            context: RoutableProfileContext(values: values, goals: goals, boundaries: boundaries),
+            denials: denials
+        )
+    }
+}
+
+/// A single purpose-bound denial of a profile item, recorded for audit.
+public struct ProfileItemDenial: Sendable {
+    public var elementType: String
+    public var elementID: UUID
+    public var purposes: [AccessPurpose]
+
+    public init(elementType: String, elementID: UUID, purposes: [AccessPurpose]) {
+        self.elementType = elementType
+        self.elementID = elementID
+        self.purposes = purposes
+    }
+}
+
+/// The result of evaluating profile access for a set of purposes: the items that may be
+/// routed to agents plus one denial entry per excluded item.
+public struct ProfileAccessDecision: Sendable {
+    public var context: RoutableProfileContext
+    public var denials: [ProfileItemDenial]
+
+    public init(context: RoutableProfileContext, denials: [ProfileItemDenial]) {
+        self.context = context
+        self.denials = denials
     }
 }

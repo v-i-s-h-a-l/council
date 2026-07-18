@@ -10,6 +10,7 @@ struct EpisodicGistRecord: Codable, FetchableRecord, MutablePersistableRecord {
     var sessionID: UUID
     var question: String
     var createdAt: Date
+    var deniedPurposesJSON: String
     var isLocked: Bool
 
     // Encrypted JSON blobs.
@@ -23,6 +24,7 @@ struct EpisodicGistRecord: Codable, FetchableRecord, MutablePersistableRecord {
         static let sessionID = Column("sessionID")
         static let question = Column("question")
         static let createdAt = Column("createdAt")
+        static let deniedPurposesJSON = Column("deniedPurposesJSON")
         static let isLocked = Column("isLocked")
         static let summaryEncrypted = Column("summaryEncrypted")
         static let tradeOffsEncrypted = Column("tradeOffsEncrypted")
