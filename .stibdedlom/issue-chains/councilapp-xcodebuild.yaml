@@ -1,0 +1,44 @@
+schema_version: sdl-issue-chain@2
+kind: sdl-issue-chain
+project_ref: project://v-i-s-h-a-l/council
+base_ref: main
+invocation_policy_ref: .stibdedlom/invocation-policy.yaml
+autonomy_default: approval-required
+version: 1
+etag: sha256:5a0bbfb7e45ee42f4fb1df91034832088447edd643d8f1751e2df3ed0d3a0e6b
+issues:
+- number: 16
+  title: Fix xcodebuild validation for CouncilApp macOS and iOS Simulator builds
+  capability: capability-apple-native-development
+  role: null
+  intent_class: execution
+  allowed_paths:
+  - CouncilApp/project.yml
+  - CouncilApp/generate-project.sh
+  - CouncilApp/CouncilApp.xcodeproj
+  - CouncilApp/Sources/CouncilApp
+  - CouncilApp/Sources/CouncilUI/Views/VoiceInputButton.swift
+  - Council/Package.swift
+  - docs/PLAN.md
+  - registry/lifecycle
+  - registry/telemetry
+  authority:
+    approval_gate: user-instruction
+    verification: xcodebuild -scheme CouncilApp -destination 'platform=macOS' build
+      passes; xcodebuild -scheme CouncilApp -destination 'platform=iOS Simulator,name=iPhone
+      16 Pro' build passes or is documented as blocked by upstream with a tracked
+      workaround; swift test in Council/ still passes.
+    rollback_plan: git revert commits on sdl/issue-16-councilapp-xcodebuild; restore
+      CouncilApp/project.yml from main; remove any local mlx-swift fork references.
+  depends_on: []
+  execution_policy: {}
+  envelope_hash: sha256:e9910fbbac83a7a447e905f53bfb62f22e7c8c7d04d5c3fe90125e41e63e9847
+  lifecycle_record_id: c77412a0-ae2e-4802-814f-d8f6f4eaa681
+  kid: rk-2026-07-09-44177cda
+  algorithm: ed25519
+  runtime_binding:
+    branch: sdl/issue-16-councilapp-xcodebuild
+    worktree_path: /Users/vishalsingh/Documents/v-i-s-h-a-l/github/council-worktrees/councilapp
+    base_sha: a08c345919024bef165bf1fe4f4899675357a707
+    base_ref: sdl/issue-16-councilapp-xcodebuild
+    max_commits_ahead: 50
