@@ -15,12 +15,14 @@ public actor MemoryService {
     public func recordEpisode(
         sessionID: UUID,
         question: String,
-        perspective: Perspective
+        perspective: Perspective,
+        deniedPurposes: [AccessPurpose] = []
     ) async throws {
         let gist = EpisodicGist(
             sessionID: sessionID,
             question: question,
-            perspective: perspective
+            perspective: perspective,
+            deniedPurposes: deniedPurposes
         )
         try await store.saveEpisode(gist)
     }
@@ -85,11 +87,23 @@ public actor MemoryService {
     /// Returns unlocked temporal facts authorized for the given purposes.
     ///
     /// A fact is authorized when the requested purposes overlap its `accessScope` and
-    /// do not overlap its `deniedPurposes`. When `purposes` is non-empty, a single
-    /// purpose-bound access decision is recorded in the audit log.
+    /// do not overlap its `deniedPurposes`. When `purposes` is non-empty, the access
+    /// decision is recorded in the audit log: one aggregate entry for the allowed
+    /// facts and one entry per denied fact so users can verify exclusions.
     public func facts(subject: String? = nil, purposes: [AccessPurpose]) async throws -> [TemporalFact] {
-        let filter = MemoryFilter(purposes: purposes, locked: false, subject: subject)
-        let results = try await store.temporalFacts(matching: filter)
+        let all = try await store.temporalFacts(matching: MemoryFilter(locked: false, subject: subject))
+        let request = Set(purposes)
+        var allowed: [TemporalFact] = []
+        var denied: [TemporalFact] = []
+        for fact in all {
+            let isAllowed = !request.isDisjoint(with: Set(fact.accessScope))
+                && request.isDisjoint(with: Set(fact.deniedPurposes))
+            if isAllowed {
+                allowed.append(fact)
+            } else {
+                denied.append(fact)
+            }
+        }
         if !purposes.isEmpty {
             let purposeNames = purposes.map(\.rawValue).sorted().joined(separator: ",")
             try? await appendAuditEntry(
@@ -98,11 +112,22 @@ public actor MemoryService {
                     "purpose": purposeNames,
                     "dataElementType": "TemporalFact",
                     "decision": "allowed",
-                    "count": "\(results.count)",
+                    "count": "\(allowed.count)",
                 ]
             )
+            for fact in denied {
+                try? await appendAuditEntry(
+                    category: .memoryAccess,
+                    payload: [
+                        "purpose": purposeNames,
+                        "dataElementType": "TemporalFact",
+                        "decision": "denied",
+                        "elementID": fact.id.uuidString,
+                    ]
+                )
+            }
         }
-        return results
+        return allowed
     }
 
     /// Verifies the integrity of the audit chain.

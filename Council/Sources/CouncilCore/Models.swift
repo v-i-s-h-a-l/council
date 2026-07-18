@@ -93,17 +93,23 @@ public struct ValueStatement: Codable, Sendable {
     public var text: String
     public var createdAt: Date?
     public var tags: [String]
+    public var accessScope: [AccessPurpose]
+    public var deniedPurposes: [AccessPurpose]
 
     public init(
         id: UUID = UUID(),
         text: String,
         createdAt: Date? = nil,
-        tags: [String] = []
+        tags: [String] = [],
+        accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
+        deniedPurposes: [AccessPurpose] = []
     ) {
         self.id = id
         self.text = text
         self.createdAt = createdAt
         self.tags = tags
+        self.accessScope = accessScope
+        self.deniedPurposes = deniedPurposes
     }
 
     enum CodingKeys: String, CodingKey {
@@ -111,15 +117,20 @@ public struct ValueStatement: Codable, Sendable {
         case text
         case createdAt
         case tags
+        case accessScope
+        case deniedPurposes
     }
 
-    /// Decodes tolerantly so pre-Phase-2 values that omit `tags`/`createdAt` still load.
+    /// Decodes tolerantly so values persisted before PBAC fields existed still load;
+    /// they default to the full deliberation scope with no denials.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         self.text = try container.decode(String.self, forKey: .text)
         self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        self.accessScope = try container.decodeIfPresent([AccessPurpose].self, forKey: .accessScope) ?? AccessPurpose.allDeliberation
+        self.deniedPurposes = try container.decodeIfPresent([AccessPurpose].self, forKey: .deniedPurposes) ?? []
     }
 }
 
@@ -130,6 +141,8 @@ public struct Goal: Codable, Sendable {
     public var createdAt: Date?
     public var tags: [String]
     public var status: GoalStatus?
+    public var accessScope: [AccessPurpose]
+    public var deniedPurposes: [AccessPurpose]
 
     public init(
         id: UUID = UUID(),
@@ -137,7 +150,9 @@ public struct Goal: Codable, Sendable {
         timeframe: String? = nil,
         createdAt: Date? = nil,
         tags: [String] = [],
-        status: GoalStatus? = nil
+        status: GoalStatus? = nil,
+        accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
+        deniedPurposes: [AccessPurpose] = []
     ) {
         self.id = id
         self.text = text
@@ -145,6 +160,8 @@ public struct Goal: Codable, Sendable {
         self.createdAt = createdAt
         self.tags = tags
         self.status = status
+        self.accessScope = accessScope
+        self.deniedPurposes = deniedPurposes
     }
 
     enum CodingKeys: String, CodingKey {
@@ -154,9 +171,12 @@ public struct Goal: Codable, Sendable {
         case createdAt
         case tags
         case status
+        case accessScope
+        case deniedPurposes
     }
 
-    /// Decodes tolerantly so pre-Phase-2 goals that omit `tags`/`createdAt`/`status` still load.
+    /// Decodes tolerantly so goals persisted before PBAC fields existed still load;
+    /// they default to the full deliberation scope with no denials.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
@@ -165,6 +185,8 @@ public struct Goal: Codable, Sendable {
         self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         self.status = try container.decodeIfPresent(GoalStatus.self, forKey: .status)
+        self.accessScope = try container.decodeIfPresent([AccessPurpose].self, forKey: .accessScope) ?? AccessPurpose.allDeliberation
+        self.deniedPurposes = try container.decodeIfPresent([AccessPurpose].self, forKey: .deniedPurposes) ?? []
     }
 }
 
@@ -174,19 +196,25 @@ public struct Boundary: Codable, Sendable {
     public var createdAt: Date?
     public var tags: [String]
     public var severity: BoundarySeverity?
+    public var accessScope: [AccessPurpose]
+    public var deniedPurposes: [AccessPurpose]
 
     public init(
         id: UUID = UUID(),
         text: String,
         createdAt: Date? = nil,
         tags: [String] = [],
-        severity: BoundarySeverity? = nil
+        severity: BoundarySeverity? = nil,
+        accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
+        deniedPurposes: [AccessPurpose] = []
     ) {
         self.id = id
         self.text = text
         self.createdAt = createdAt
         self.tags = tags
         self.severity = severity
+        self.accessScope = accessScope
+        self.deniedPurposes = deniedPurposes
     }
 
     enum CodingKeys: String, CodingKey {
@@ -195,9 +223,12 @@ public struct Boundary: Codable, Sendable {
         case createdAt
         case tags
         case severity
+        case accessScope
+        case deniedPurposes
     }
 
-    /// Decodes tolerantly so pre-Phase-2 boundaries that omit `tags`/`createdAt`/`severity` still load.
+    /// Decodes tolerantly so boundaries persisted before PBAC fields existed still load;
+    /// they default to the full deliberation scope with no denials.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
@@ -205,6 +236,8 @@ public struct Boundary: Codable, Sendable {
         self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         self.tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         self.severity = try container.decodeIfPresent(BoundarySeverity.self, forKey: .severity)
+        self.accessScope = try container.decodeIfPresent([AccessPurpose].self, forKey: .accessScope) ?? AccessPurpose.allDeliberation
+        self.deniedPurposes = try container.decodeIfPresent([AccessPurpose].self, forKey: .deniedPurposes) ?? []
     }
 }
 
@@ -325,6 +358,10 @@ public struct RoutableProfileContext: Codable, Sendable {
         self.boundaries = boundaries
     }
 
+    /// Unfiltered initializer: copies ALL values, goals, and boundaries without
+    /// evaluating `accessScope`/`deniedPurposes`. Intended for user-inspection paths
+    /// (e.g. `council profile show`), never for building agent context — use
+    /// `ProfileService.routableContext(purposes:)` for that.
     public init(profile: UserProfile) {
         self.values = profile.values
         self.goals = profile.goals
@@ -334,11 +371,19 @@ public struct RoutableProfileContext: Codable, Sendable {
 
 // MARK: - Memory
 
-public enum AccessPurpose: String, Codable, Sendable {
+public enum AccessPurpose: String, Codable, Sendable, CaseIterable {
     case purchaseDeliberation
     case travelDeliberation
     case lifeDeliberation
     case userInspection
+
+    /// Every deliberation purpose (everything except `.userInspection`). This is the
+    /// default access scope for routable profile elements.
+    public static let allDeliberation: [AccessPurpose] = [
+        .purchaseDeliberation,
+        .travelDeliberation,
+        .lifeDeliberation,
+    ]
 }
 
 public struct TemporalFact: Codable, Sendable, Identifiable {
@@ -407,6 +452,7 @@ public struct EpisodicGist: Codable, Sendable, Identifiable {
     public var question: String
     public var createdAt: Date
     public var perspective: Perspective
+    public var deniedPurposes: [AccessPurpose]
     public var isLocked: Bool
 
     public init(
@@ -415,6 +461,7 @@ public struct EpisodicGist: Codable, Sendable, Identifiable {
         question: String,
         createdAt: Date = Date(),
         perspective: Perspective = Perspective(),
+        deniedPurposes: [AccessPurpose] = [],
         isLocked: Bool = false
     ) {
         self.id = id
@@ -422,7 +469,30 @@ public struct EpisodicGist: Codable, Sendable, Identifiable {
         self.question = question
         self.createdAt = createdAt
         self.perspective = perspective
+        self.deniedPurposes = deniedPurposes
         self.isLocked = isLocked
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case sessionID
+        case question
+        case createdAt
+        case perspective
+        case deniedPurposes
+        case isLocked
+    }
+
+    /// Decodes tolerantly so gists persisted before `deniedPurposes` existed still load.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.sessionID = try container.decode(UUID.self, forKey: .sessionID)
+        self.question = try container.decode(String.self, forKey: .question)
+        self.createdAt = try container.decode(Date.self, forKey: .createdAt)
+        self.perspective = try container.decode(Perspective.self, forKey: .perspective)
+        self.deniedPurposes = try container.decodeIfPresent([AccessPurpose].self, forKey: .deniedPurposes) ?? []
+        self.isLocked = try container.decodeIfPresent(Bool.self, forKey: .isLocked) ?? false
     }
 }
 

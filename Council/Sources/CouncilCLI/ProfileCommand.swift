@@ -95,9 +95,20 @@ extension ProfileCommand.ValueCommand {
         @Option(name: .shortAndLong, help: "Tag to attach to the value. May be repeated.")
         var tag: [String] = []
 
+        @Option(name: .long, help: "Purpose the value is routable for. May be repeated. Defaults to all deliberation purposes.")
+        var purpose: [AccessPurpose] = []
+
+        @Option(name: .long, help: "Purpose explicitly denied for this value. May be repeated.")
+        var deniedPurpose: [AccessPurpose] = []
+
         func run() async throws {
             let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
-            let statement = try await assembly.profileService.addValue(text, tags: tag)
+            let statement = try await assembly.profileService.addValue(
+                text,
+                tags: tag,
+                accessScope: purpose.isEmpty ? AccessPurpose.allDeliberation : purpose,
+                deniedPurposes: deniedPurpose
+            )
             try printOutput(id: statement.id, format: options.format)
         }
     }
@@ -157,13 +168,21 @@ extension ProfileCommand.GoalCommand {
         @Option(help: "Goal status: active, completed, or paused.")
         var status: GoalStatus?
 
+        @Option(name: .long, help: "Purpose the goal is routable for. May be repeated. Defaults to all deliberation purposes.")
+        var purpose: [AccessPurpose] = []
+
+        @Option(name: .long, help: "Purpose explicitly denied for this goal. May be repeated.")
+        var deniedPurpose: [AccessPurpose] = []
+
         func run() async throws {
             let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
             let goal = try await assembly.profileService.addGoal(
                 text,
                 timeframe: timeframe,
                 tags: tag,
-                status: status
+                status: status,
+                accessScope: purpose.isEmpty ? AccessPurpose.allDeliberation : purpose,
+                deniedPurposes: deniedPurpose
             )
             try printOutput(id: goal.id, format: options.format)
         }
@@ -221,12 +240,20 @@ extension ProfileCommand.BoundaryCommand {
         @Option(help: "Boundary severity: low, medium, high, or critical.")
         var severity: BoundarySeverity?
 
+        @Option(name: .long, help: "Purpose the boundary is routable for. May be repeated. Defaults to all deliberation purposes.")
+        var purpose: [AccessPurpose] = []
+
+        @Option(name: .long, help: "Purpose explicitly denied for this boundary. May be repeated.")
+        var deniedPurpose: [AccessPurpose] = []
+
         func run() async throws {
             let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
             let boundary = try await assembly.profileService.addBoundary(
                 text,
                 tags: tag,
-                severity: severity
+                severity: severity,
+                accessScope: purpose.isEmpty ? AccessPurpose.allDeliberation : purpose,
+                deniedPurposes: deniedPurpose
             )
             try printOutput(id: boundary.id, format: options.format)
         }

@@ -14,6 +14,9 @@ public actor MockMemoryStore: MemoryStore {
 
     public func episodes(matching filter: MemoryFilter) async throws -> [EpisodicGist] {
         episodes.filter { episode in
+            if let purposes = filter.purposes {
+                guard Set(purposes).isDisjoint(with: Set(episode.deniedPurposes)) else { return false }
+            }
             if let locked = filter.locked, locked != episode.isLocked { return false }
             if let subject = filter.subject, !episode.question.contains(subject) { return false }
             return true
@@ -38,6 +41,7 @@ public actor MockMemoryStore: MemoryStore {
                 question: episodes[index].question,
                 createdAt: episodes[index].createdAt,
                 perspective: episodes[index].perspective,
+                deniedPurposes: episodes[index].deniedPurposes,
                 isLocked: isLocked
             )
         }

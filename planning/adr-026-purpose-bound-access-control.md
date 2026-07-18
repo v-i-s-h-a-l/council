@@ -1,6 +1,6 @@
 # ADR-026: Purpose-Bound Access Control for Profile and Memory Context
 
-**Status:** Accepted — core PBAC policy implemented in PR #29; per-purpose narrowing of profile items and `EpisodicGist.deniedPurposes` remain follow-up  
+**Status:** Accepted — core PBAC policy implemented in PR #29; per-purpose narrowing of profile items, `EpisodicGist.deniedPurposes`, and per-item deny-decision audit logging for agent-routed elements (profile items and temporal facts) completed in issue #36. Episode deny enforcement is store-level only; episodes are not yet routed to agents, so no episode-deny audit entries are emitted.
 **Lifecycle record:** `6171148c-c5fd-4d38-bd99-786de23866ac`  
 **Issue:** #26  
 **Date:** 2026-07-09

@@ -1,0 +1,32 @@
+schema_version: sdl-enforcement-metrics@1
+window_start: '2026-07-18T19:50:21.508088+00:00'
+window_end: '2026-07-18T19:50:21.513687+00:00'
+evaluations: 1
+decisions:
+  allow: 0
+  block: 1
+  escalate: 0
+reason_codes:
+  sdl.runtime.no_active_attestation: 1
+stage_failures:
+  attestation_resolution: 1
+tool_decisions:
+  file_write:
+    allow: 0
+    block: 1
+    escalate: 0
+path_violations: {}
+branch_drift_events: {}
+signature_failures: {}
+policy_blocks: 0
+latency_ms:
+  samples: 1
+  p50: 1.879
+  p95: 1.879
+  p99: 1.879
+top_blocked_tools:
+- tool: file_write
+  blocks: 1
+top_path_violations: []
+capability_id: capability-client-orchestrator
+event_id: metric-capability-client-orchestrator-2026-07-18T19:50:21.508088+00:00-1

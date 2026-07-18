@@ -112,6 +112,12 @@ public actor GRDBMemoryStore: MemoryStore {
             let records = try request.fetchAll(db)
             return try records.compactMap { try $0.toGist(key: databaseKey) }
         }.filter { episode in
+            if let purposes = filter.purposes {
+                // Episodes carry an explicit deny set only; any overlap blocks access.
+                guard Set(purposes).isDisjoint(with: Set(episode.deniedPurposes)) else {
+                    return false
+                }
+            }
             if let subject = filter.subject {
                 return episode.question.localizedStandardContains(subject)
             }
@@ -311,8 +317,10 @@ extension EpisodicGistRecord {
         self.createdAt = episode.createdAt
         self.isLocked = episode.isLocked
 
-        let perspective = episode.perspective
         let encoder = JSONEncoder()
+        self.deniedPurposesJSON = String(data: try encoder.encode(episode.deniedPurposes), encoding: .utf8) ?? "[]"
+
+        let perspective = episode.perspective
         self.summaryEncrypted = try FieldEncryption.encrypt(
             plaintext: Data(perspective.summary.utf8),
             key: key
@@ -338,6 +346,15 @@ extension EpisodicGistRecord {
         let tradeOffs = try decoder.decode([String].self, from: try FieldEncryption.decrypt(ciphertext: tradeOffsEncrypted, key: key))
         let blindSpots = try decoder.decode([String].self, from: try FieldEncryption.decrypt(ciphertext: blindSpotsEncrypted, key: key))
         let dissent = try decoder.decode([String].self, from: try FieldEncryption.decrypt(ciphertext: dissentEncrypted, key: key))
+        // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v3 migration); tolerate that default,
+        // but fail CLOSED on a corrupt non-default payload so a damaged deny set can never
+        // silently become routable.
+        let deniedPurposes: [AccessPurpose]
+        if let decoded = try? decoder.decode([AccessPurpose].self, from: Data(deniedPurposesJSON.utf8)) {
+            deniedPurposes = decoded
+        } else {
+            deniedPurposes = deniedPurposesJSON == "[]" ? [] : AccessPurpose.allCases
+        }
 
         return EpisodicGist(
             id: id,
@@ -350,6 +367,7 @@ extension EpisodicGistRecord {
                 blindSpots: blindSpots,
                 dissent: dissent
             ),
+            deniedPurposes: deniedPurposes,
             isLocked: isLocked
         )
     }
@@ -377,8 +395,15 @@ extension TemporalFactRecord {
         let objectData = try FieldEncryption.decrypt(ciphertext: objectEncrypted, key: key)
         let object = String(data: objectData, encoding: .utf8) ?? ""
         let accessScope = try decoder.decode([AccessPurpose].self, from: Data(accessScopeJSON.utf8))
-        // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v2 migration); tolerate absence defensively.
-        let deniedPurposes = (try? decoder.decode([AccessPurpose].self, from: Data(deniedPurposesJSON.utf8))) ?? []
+        // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v2 migration); tolerate that default,
+        // but fail CLOSED on a corrupt non-default payload so a damaged deny set can never
+        // silently become routable.
+        let deniedPurposes: [AccessPurpose]
+        if let decoded = try? decoder.decode([AccessPurpose].self, from: Data(deniedPurposesJSON.utf8)) {
+            deniedPurposes = decoded
+        } else {
+            deniedPurposes = deniedPurposesJSON == "[]" ? [] : AccessPurpose.allCases
+        }
 
         return TemporalFact(
             id: id,

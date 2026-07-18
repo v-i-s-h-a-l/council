@@ -1,0 +1,32 @@
+schema_version: sdl-enforcement-metrics@1
+window_start: '2026-07-18T19:41:23.532651+00:00'
+window_end: '2026-07-18T19:41:23.538893+00:00'
+evaluations: 1
+decisions:
+  allow: 0
+  block: 0
+  escalate: 1
+reason_codes:
+  sdl.runtime.trust_hash_mismatch: 1
+stage_failures:
+  trust_anchor: 1
+tool_decisions:
+  file_write:
+    allow: 0
+    block: 0
+    escalate: 1
+path_violations: {}
+branch_drift_events: {}
+signature_failures: {}
+policy_blocks: 0
+latency_ms:
+  samples: 1
+  p50: 1.655
+  p95: 1.655
+  p99: 1.655
+top_blocked_tools:
+- tool: file_write
+  blocks: 0
+top_path_violations: []
+capability_id: capability-client-orchestrator
+event_id: metric-capability-client-orchestrator-2026-07-18T19:41:23.532651+00:00-1
