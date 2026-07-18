@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0.0",
+  "record_id": "d9d47603-673e-4296-8a1c-543efab38cae",
+  "capability_id": "capability-apple-native-development",
+  "target_lifecycle": "draft",
+  "approver": "capability-implementation-reviewer",
+  "approver_type": "capability",
+  "verdict": "approved_with_notes",
+  "verdict_code": "PASS_WITH_NOTES",
+  "reviewed_at": "2026-07-16T04:46:22+00:00",
+  "pr": "https://github.com/v-i-s-h-a-l/council/pull/32",
+  "branch": "sdl/issue-16-councilapp-xcodebuild",
+  "head_sha": "937f10be01270c5cce2f3114bb286028de5d42fd",
+  "issue": 16,
+  "self_authorization_check": {
+    "status": "passed",
+    "caller_id": "capability-apple-native-development",
+    "callee_id": "capability-implementation-reviewer",
+    "distinct_identity": true,
+    "promotion_authority_override": false,
+    "attestation_uri": ".stibdedlom/routing/16.json",
+    "dispatch_instance_tag": "issue-16-xcodebuild-sibling-review"
+  },
+  "tier": 1,
+  "required_reviewers": [
+    "sibling-agent"
+  ],
+  "verification": {
+    "macos_build": {
+      "command": "xcodebuild -project CouncilApp/CouncilApp.xcodeproj -scheme CouncilApp -destination 'platform=macOS' build -skipPackagePluginValidation -skipMacroValidation CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO",
+      "result": "BUILD SUCCEEDED"
+    },
+    "ios_simulator_build": {
+      "command": "xcodebuild -project CouncilApp/CouncilApp.xcodeproj -scheme CouncilApp -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build -skipPackagePluginValidation -skipMacroValidation CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO",
+      "result": "BUILD SUCCEEDED"
+    },
+    "swift_test": {
+      "command": "swift test (Council/)",
+      "result": "117 tests passed, 0 failures; process exit 1 due to pre-existing MLX metallib load crash (Source/Cmlx/.../stream.cpp:115) after all suites completed",
+      "regression_assessment": "no regression: fork diff is confined to Source/Encuda; Cmlx sources are byte-identical to upstream v0.31.5, so the metallib crash cannot be caused by this change"
+    },
+    "attestation_signature": {
+      "file": ".stibdedlom/routing/16.json",
+      "algorithm": "ed25519",
+      "kid": "rk-2026-07-09-44177cda",
+      "result": "cryptographically valid (independently re-verified against .stibdedlom/trust/pubkeys/rk-2026-07-09-44177cda.pub using the sdl_hooks canonicalization: JSON minus signature field, sort_keys, compact separators)",
+      "expires_at": "2026-07-23T04:19:30.086667+00:00"
+    },
+    "commit_trailers": {
+      "SDL-Commit-Author": "capability-apple-native-development",
+      "SDL-Routing-Attestation": "16",
+      "Task-Ref": "issue-16",
+      "Lifecycle-Record-ID": "c77412a0-ae2e-4802-814f-d8f6f4eaa681",
+      "result": "all present on 937f10b"
+    },
+    "allowed_paths": "changed paths (Council/Package.swift, docs/PLAN.md) are within attestation allowed_paths; .stibdedlom/routing/16.json is the attestation itself"
+  },
+  "sibling_review": {
+    "provider": "sibling-agent",
+    "dispatch_instance_tag": "issue-16-xcodebuild-sibling-review",
+    "findings": [
+      {
+        "finding_id": "issue16-sr-001",
+        "severity": "info",
+        "rule_ref": "sdl.review.correctness",
+        "affected_ref": "Council/Package.swift + mlx-swift fork (155aaa7)",
+        "issue": "iOS Simulator build failure root cause confirmed and fix verified end-to-end.",
+        "remediation": "None required. Fork is upstream v0.31.5 (eb889e0) plus exactly one commit guarding all Process usage in Source/Encuda; both macOS and iOS Simulator destinations build successfully."
+      },
+      {
+        "finding_id": "issue16-sr-002",
+        "severity": "info",
+        "rule_ref": "sdl.review.safety",
+        "affected_ref": "mlx-swift fork Source/Encuda/{encuda-compile,encuda-link,encuda-utils}.swift",
+        "issue": "Platform guards are semantically correct.",
+        "remediation": "None required. All Process references sit inside #if os(macOS) || os(Linux); ProcessInfo (iOS-available) is correctly left unguarded; the #if branch preserves upstream code verbatim so macOS/Linux behavior is unchanged; the #else fatalError paths are unreachable in practice because encuda is a host-side CUDA build helper invoked by the CudaBuild plugin on macOS/Linux only."
+      },
+      {
+        "finding_id": "issue16-sr-003",
+        "severity": "important",
+        "rule_ref": "sdl.review.portability",
+        "affected_ref": "Council/Package.swift:20",
+        "issue": "Dependency is an absolute machine-local path (/Users/vishalsingh/Documents/v-i-s-h-a-l/github/mlx-swift). Any other machine, contributor, or future Swift-build CI will fail at package resolution.",
+        "remediation": "Accepted as temporary unblock: docs/PLAN.md documents the fork requirement and revert path, and no CI currently builds Swift (only sdl-governance.yml exists). Revert to the upstream URL as soon as ml-explore/mlx-swift fixes the encuda target; consider a relative path or git-URL fork if a second machine needs to build before then."
+      },
+      {
+        "finding_id": "issue16-sr-004",
+        "severity": "important",
+        "rule_ref": "sdl.review.maintainability",
+        "affected_ref": "Council/Package.swift + docs/PLAN.md",
+        "issue": "SwiftPM emits a conflicting-identity warning: mlx-swift-lm depends on remote github.com/ml-explore/mlx-swift while Council depends on the local path; SwiftPM resolves it (local wins) but states this will be escalated to an error in a future SwiftPM version. PLAN.md does not mention this warning.",
+        "remediation": "Add the identity-conflict caveat to the PLAN.md build note so the revert path is understood as time-boxed by SwiftPM behavior, not only by upstream fixing encuda."
+      },
+      {
+        "finding_id": "issue16-sr-005",
+        "severity": "info",
+        "rule_ref": "sdl.review.hygiene",
+        "affected_ref": "mlx-swift fork tag 0.31.5",
+        "issue": "The fork's local 0.31.5 tag was moved from upstream's eb889e0 to the guard commit 155aaa7 (verified against api.github.com repos/ml-explore/mlx-swift/git/refs/tags/0.31.5).",
+        "remediation": "Functionally irrelevant for a path dependency (SwiftPM ignores tags) and the fork carries the explicit 0.31.5-council.1 tag, but re-point 0.31.5 to eb889e0 to avoid misleading future readers."
+      },
+      {
+        "finding_id": "issue16-sr-006",
+        "severity": "info",
+        "rule_ref": "sdl.review.governance",
+        "affected_ref": ".stibdedlom/routing/16.json, commit 937f10b",
+        "issue": "Governance in order: attestation well-formed (sdl-routing-attestation@2), Ed25519 signature valid, not expired, capability matches SDL-Commit-Author trailer, allowed_paths cover the change set.",
+        "remediation": "None. Note the commit used --no-verify due to the documented pre-commit hook debt (#28); the staged set was validated manually via validate-commit.py per the commit message."
+      },
+      {
+        "finding_id": "issue16-sr-007",
+        "severity": "info",
+        "rule_ref": "sdl.review.governance",
+        "affected_ref": ".github/workflows/sdl-governance.yml",
+        "issue": "sdl-governance CI check is red on this PR.",
+        "remediation": "Pre-existing on main since 2026-07-09 and not introduced by this PR: .stibdedlom/bin and .stibdedlom/lib are tracked symlinks to absolute local paths, so validate-schemas.py does not exist in CI checkouts. Track separately (related to governance debt on #28); do not block this PR on it."
+      },
+      {
+        "finding_id": "issue16-sr-008",
+        "severity": "info",
+        "rule_ref": "sdl.review.regression",
+        "affected_ref": "Council (swift test)",
+        "issue": "swift test exits 1 from the MLX metallib load crash after all 117 tests pass.",
+        "remediation": "No action for this PR: the crash is in Cmlx (untouched by the fork's encuda-only diff, byte-identical to upstream v0.31.5) and is documented as pre-existing on main. It prevents a green exit code, so any future CI test gate must account for it."
+      }
+    ]
+  }
+}
