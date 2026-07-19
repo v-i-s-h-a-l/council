@@ -1,4 +1,5 @@
 import CouncilAgents
+@testable import CouncilCLI
 import CouncilCore
 import CouncilInference
 import Foundation
@@ -255,5 +256,66 @@ struct CLIIntegrationTests {
         let context = RoutableProfileContext(profile: profile)
         #expect(context.values.count == 1)
         // RoutableProfileContext intentionally omits financialHistory and journalEntries.
+    }
+
+    @Test("tools list through CLI writes toolCall audit entries")
+    func toolsListWritesAuditEntries() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let fixture = try makeFixtureMCPServer(in: root)
+        var command = try ToolsCommand.ListCommand.parse([
+            "--server", "python3 \(fixture.path)",
+            "--profile-dir", root.path,
+        ])
+        try await command.run()
+
+        let assembly = try await RuntimeAssembly(rootDirectory: root, useSecureEnclave: false)
+        let entries = try await assembly.memoryService.auditLog.entries(
+            since: nil,
+            limit: nil,
+            includePayloads: true
+        )
+        let toolCalls = entries.filter { $0.category == .toolCall }
+        #expect(toolCalls.count == 1)
+        #expect(toolCalls.first?.payload["operation"] == "listTools")
+        #expect(toolCalls.first?.payload["decision"] == "allowed")
+        // Only the executable basename is persisted, never the full command line.
+        #expect(toolCalls.first?.payload["server"] == "python3")
+        #expect(try await assembly.memoryService.verifyAuditChain())
+    }
+
+    /// Writes a minimal newline-delimited JSON-RPC MCP fixture server.
+    private func makeFixtureMCPServer(in directory: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let script = """
+        import sys, json
+
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                msg = json.loads(line)
+            except Exception:
+                continue
+            method = msg.get("method")
+            if method == "initialize":
+                resp = {"jsonrpc": "2.0", "id": msg["id"], "result": {"protocolVersion": "2024-11-05", "capabilities": {}, "serverInfo": {"name": "fixture", "version": "0.0.1"}}}
+            elif method == "notifications/initialized":
+                continue
+            elif method == "tools/list":
+                resp = {"jsonrpc": "2.0", "id": msg["id"], "result": {"tools": [
+                    {"name": "echo", "description": "Echo back the input", "inputSchema": {"type": "object"}}
+                ]}}
+            else:
+                resp = {"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32601, "message": "unknown method"}}
+            sys.stdout.write(json.dumps(resp) + "\\n")
+            sys.stdout.flush()
+        """
+        let path = directory.appendingPathComponent("fixture_server.py")
+        try script.write(to: path, atomically: true, encoding: .utf8)
+        return path
     }
 }

@@ -506,6 +506,7 @@ public enum AuditCategory: String, Codable, Sendable {
     case perspectiveProduced
     case cancellation
     case memoryAccess
+    case toolCall
     case error
 }
 

@@ -1,0 +1,33 @@
+{
+  "schema_version": "sdl-routing-attestation@2",
+  "issue": 38,
+  "chain_id": "phase-3-tool-foundation",
+  "node_id": "38",
+  "goal": "Phase 3 foundation: least-privilege MCP tool layer (protocols, stdio client, tool-call audit, council tools CLI)",
+  "allowed_paths": [
+    "Council/Sources",
+    "Council/Tests",
+    "Council/Package.swift",
+    "docs",
+    "planning",
+    "registry/lifecycle",
+    "registry/telemetry"
+  ],
+  "envelope_hash": "sha256:38e4b7ba9798c4e24f38ef518142d86d9608d93f5c010318c56e7dd4af2e7650",
+  "policy_ref": ".stibdedlom/invocation-policy.yaml",
+  "manifest_path": ".stibdedlom/manifest.yaml",
+  "base_ref": "sdl/issue-38-phase-3-tool-foundation",
+  "created_at": "2026-07-19T02:54:21.980146+00:00",
+  "expires_at": "2026-07-26T02:54:21.980146+00:00",
+  "kid": "rk-2026-07-09-44177cda",
+  "algorithm": "ed25519",
+  "runtime_binding": {
+    "branch": "sdl/issue-38-phase-3-tool-foundation",
+    "worktree_path": "/Users/vishalsingh/Documents/v-i-s-h-a-l/github/council",
+    "base_sha": "92624a986ab9163f1694a54c3b42a96b4b08aaf8",
+    "base_ref": "sdl/issue-38-phase-3-tool-foundation",
+    "max_commits_ahead": 50
+  },
+  "capability": "capability-apple-native-development",
+  "signature": "ed25519:WSMB2yVEBrnntD6PE7U8WxDnqDoJZUchFj+gYPiLmaBWhmHQtGdAYbUQNX17TES3M9XFivNOlcFVB7dYLkv+BA=="
+}

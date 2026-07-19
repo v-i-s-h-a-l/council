@@ -1,0 +1,47 @@
+event_id: ci-3c9db701-1dfe-4e9c-a5c6-a59546ad7f35
+event_type: capability_invocation
+timestamp: '2026-07-19T02:54:21Z'
+capability_id: capability-apple-native-development
+task_ref: issue-38
+source:
+  repo_kind: client
+  project_id: v-i-s-h-a-l/council
+  branch: sdl/issue-38-phase-3-tool-foundation
+  actor: vishalsingh
+goal: 'Phase 3 foundation: least-privilege MCP tool layer (protocols, stdio client,
+  tool-call audit, council tools CLI)'
+intent: execution
+mode: single-capability
+authority:
+  allow_mutation: true
+  allowed_paths:
+  - Council/Sources
+  - Council/Tests
+  - Council/Package.swift
+  - docs
+  - planning
+  - registry/lifecycle
+  - registry/telemetry
+  approval_gate: user-instruction
+  branch_or_worktree_isolation: null
+  verification_and_rollback_plan:
+    verification: cd Council && swift build && swift test
+    rollback_plan: git revert HEAD
+context:
+  confidence: high
+  reason: explicit --capability-class resolved to capability-apple-native-development
+  primary_capability: capability-apple-native-development
+  selected_role: null
+outcome:
+  status: routed
+  selected_capability: capability-apple-native-development
+  selected_role: null
+performance:
+  elapsed_ms: 6068
+  token_actuals: null
+  budget_actuals: null
+downstream:
+  human_override: false
+  accepted: true
+  failed_runs: 0
+  lifecycle_record_created: false

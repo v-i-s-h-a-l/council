@@ -13,6 +13,7 @@ struct CouncilCLI: AsyncParsableCommand {
             MemoryCommand.self,
             ModelCommand.self,
             AuditCommand.self,
+            ToolsCommand.self,
         ],
         defaultSubcommand: AskCommand.self
     )

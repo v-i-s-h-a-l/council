@@ -1,3 +1,10 @@
+- event_id: ci-3c9db701-1dfe-4e9c-a5c6-a59546ad7f35
+  timestamp: '2026-07-19T02:54:21Z'
+  capability_id: capability-apple-native-development
+  task_ref: issue-38
+  outcome: routed
+  accepted: true
+  path: registry/telemetry/capability/capability-apple-native-development/2026-07-19T02-54-21Z_ci-3c9db701-1dfe-4e9c-a5c6-a59546ad7f35.yaml
 - event_id: ci-cbe5c030-90e1-4696-9f05-d720ae5746b2
   timestamp: '2026-07-18T19:49:21Z'
   capability_id: capability-apple-native-development
