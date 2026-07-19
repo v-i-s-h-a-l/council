@@ -141,9 +141,22 @@ private func audit(
 ) async {
     // Log only the executable basename, never the full command line: commands
     // may embed environment variables or arguments that must not persist in
-    // the audit chain.
-    let serverLabel = URL(fileURLWithPath: server.split(separator: " ").first.map(String.init) ?? server)
-        .lastPathComponent
+    // the audit chain. Leading `env` wrappers and VAR=value assignment
+    // prefixes are skipped so `API_KEY=secret server` cannot leak the secret.
+    let tokens = server.split(separator: " ").map(String.init)
+    var executableIndex = 0
+    if tokens.first == "env" { executableIndex = 1 }
+    let envAssignment = try? NSRegularExpression(pattern: #"^[A-Za-z_][A-Za-z0-9_]*="#)
+    while executableIndex < tokens.count,
+          envAssignment?.firstMatch(
+              in: tokens[executableIndex],
+              range: NSRange(tokens[executableIndex].startIndex..., in: tokens[executableIndex])
+          ) != nil {
+        executableIndex += 1
+    }
+    let serverLabel = executableIndex < tokens.count
+        ? URL(fileURLWithPath: tokens[executableIndex]).lastPathComponent
+        : "unknown"
     for decision in decisions {
         var payload: [String: String] = [
             "server": serverLabel,

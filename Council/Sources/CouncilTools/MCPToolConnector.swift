@@ -205,11 +205,18 @@ public actor MCPToolConnector: ToolConnector {
             line = try await withTimeout(seconds: timeout, method: method) { [self] in
                 try await readResponseLine(id: id)
             }
-        } catch ToolConnectorError.timeout {
-            // Killing the server closes the pipe, which unblocks the read task
-            // still parked in the cancelled group child.
-            terminate()
-            throw ToolConnectorError.timeout("no response to '\(method)' within \(Int(timeout))s")
+        } catch let error as ToolConnectorError {
+            switch error {
+            case .timeout, .protocolError:
+                // Killing the server closes the pipe, which unblocks the read
+                // task still parked in the cancelled group child, and resets
+                // state so the next caller respawns instead of rethrowing a
+                // stale error and leaking the child process.
+                terminate()
+            default:
+                break
+            }
+            throw error
         }
         guard let data = line.data(using: .utf8),
               let message = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
