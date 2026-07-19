@@ -210,4 +210,41 @@ struct MCPToolConnectorTests {
         #expect(recorder.decisions.first?.allowed == true)
         #expect(recorder.decisions.first?.operation == "listTools")
     }
+
+    // MARK: - Robustness regressions
+
+    @Test func concurrentCallsAreSerialized() async throws {
+        let fixture = try makeFixtureServer()
+        defer { fixture.cleanup() }
+        let connector = MCPToolConnector(command: fixture.command, timeout: 10)
+        defer { Task { await connector.terminate() } }
+
+        // Regression: concurrent callers previously crashed the process via
+        // simultaneous next() on the shared stream iterator (actor reentrancy).
+        try await withThrowingTaskGroup(of: String.self) { group in
+            for index in 0..<8 {
+                group.addTask {
+                    try await connector.callTool(name: "echo", argumentsJSON: #"{"text": "msg-\#(index)"}"#)
+                }
+            }
+            var results: [String] = []
+            for try await result in group {
+                results.append(result)
+            }
+            #expect(results.sorted() == (0..<8).map { "msg-\($0)" }.sorted())
+        }
+    }
+
+    @Test func unterminatedMegalineFailsConnection() async throws {
+        // Server emits one 2 MB line with no newline terminator.
+        let flood = "python3 -c \"import sys; sys.stdout.write('x' * 2000000); sys.stdout.flush()\""
+        let connector = MCPToolConnector(command: flood, timeout: 10)
+        defer { Task { await connector.terminate() } }
+        do {
+            _ = try await connector.listTools()
+            Issue.record("expected protocolError from byte cap")
+        } catch ToolConnectorError.protocolError(let message) {
+            #expect(message.contains("unterminated line"))
+        }
+    }
 }

@@ -50,6 +50,11 @@ These hold for every follow-on issue:
    `CouncilCore.Policy`).
 5. **CLI-first** — the CLI is the primary artifact; `CouncilApp` is untouched
    unless a follow-on issue explicitly revives it.
+6. **Server commands are user configuration, never model output** — the
+   `--server` command is executed via `/bin/sh -c`. No council agent, model
+   output, or tool result may ever populate a server command or its arguments;
+   doing so would be remote-code-execution by design. Connectors configured by
+   agents must reference pre-registered server identifiers instead.
 
 ## 4. MCP transport notes
 

@@ -50,7 +50,7 @@ extension ToolsCommand {
             do {
                 let tools = try await granted.listTools()
                 await connector.terminate()
-                try await audit(decisions: box.decisions, assembly: assembly, server: server)
+                await audit(decisions: box.decisions, assembly: assembly, server: server)
                 switch options.format {
                 case .text, .markdown:
                     if tools.isEmpty {
@@ -66,7 +66,7 @@ extension ToolsCommand {
                 }
             } catch {
                 await connector.terminate()
-                try await audit(decisions: box.decisions, assembly: assembly, server: server)
+                await audit(decisions: box.decisions, assembly: assembly, server: server)
                 throw error
             }
         }
@@ -109,7 +109,7 @@ extension ToolsCommand {
             do {
                 let result = try await granted.callTool(name: name, argumentsJSON: args)
                 await connector.terminate()
-                try await audit(decisions: box.decisions, assembly: assembly, server: server)
+                await audit(decisions: box.decisions, assembly: assembly, server: server)
                 switch options.format {
                 case .text, .markdown:
                     print(result)
@@ -118,7 +118,7 @@ extension ToolsCommand {
                 }
             } catch {
                 await connector.terminate()
-                try await audit(decisions: box.decisions, assembly: assembly, server: server)
+                await audit(decisions: box.decisions, assembly: assembly, server: server)
                 throw error
             }
         }
@@ -138,10 +138,15 @@ private func audit(
     decisions: [ToolAccessDecision],
     assembly: RuntimeAssembly,
     server: String
-) async throws {
+) async {
+    // Log only the executable basename, never the full command line: commands
+    // may embed environment variables or arguments that must not persist in
+    // the audit chain.
+    let serverLabel = URL(fileURLWithPath: server.split(separator: " ").first.map(String.init) ?? server)
+        .lastPathComponent
     for decision in decisions {
         var payload: [String: String] = [
-            "server": server,
+            "server": serverLabel,
             "operation": decision.operation,
             "decision": decision.allowed ? "allowed" : "denied",
             "purpose": decision.purposes.map(\.rawValue).sorted().joined(separator: ","),
@@ -149,9 +154,15 @@ private func audit(
         if let toolName = decision.toolName {
             payload["tool"] = toolName
         }
-        try? await assembly.memoryService.appendAuditEntry(
-            category: .toolCall,
-            payload: payload
-        )
+        do {
+            try await assembly.memoryService.appendAuditEntry(
+                category: .toolCall,
+                payload: payload
+            )
+        } catch {
+            FileHandle.standardError.write(
+                Data("council: warning: tool-call audit entry failed: \(error.localizedDescription)\n".utf8)
+            )
+        }
     }
 }

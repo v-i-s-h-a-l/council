@@ -3,12 +3,18 @@ import Foundation
 /// MCP (Model Context Protocol) client speaking JSON-RPC 2.0 over stdio.
 ///
 /// The server is spawned lazily on first use as a child process via `/bin/sh -c`
-/// and is expected to exit when stdin closes. Requests are serialized by actor
-/// isolation; every request is bounded by `timeout` so a hung server cannot
+/// and is expected to exit when stdin closes. Operations are serialized by an
+/// explicit single-flight gate (actors are reentrant across awaits, which would
+/// otherwise let concurrent callers interleave requests or share the line-stream
+/// iterator). Every request is bounded by `timeout` so a hung server cannot
 /// wedge the caller.
 ///
 /// Process spawning is only available on macOS/Linux; on other platforms every
 /// operation throws ``ToolConnectorError/unsupportedPlatform(_:)``.
+///
+/// - Important: `command` is executed via `/bin/sh -c`. It must only ever come
+/// from the local user's own configuration/flags — never from model output or
+/// any untrusted source.
 public actor MCPToolConnector: ToolConnector {
     private let command: String
     private let timeout: TimeInterval
@@ -26,10 +32,36 @@ public actor MCPToolConnector: ToolConnector {
     private var lineReader: MCPLineReader?
     private var initialized = false
     private var nextID = 1
+    private var operationInFlight = false
+    private var operationWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Single-flight gate. Actors are reentrant across awaits, so without this
+    /// two concurrent callers could interleave JSON-RPC requests or call
+    /// `next()` on the shared line-stream iterator — the latter is a Swift
+    /// runtime fatal error. Every public operation runs under the gate.
+    private func acquireOperationSlot() async {
+        if !operationInFlight {
+            operationInFlight = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            operationWaiters.append(continuation)
+        }
+    }
+
+    private func releaseOperationSlot() {
+        if operationWaiters.isEmpty {
+            operationInFlight = false
+        } else {
+            operationWaiters.removeFirst().resume()
+        }
+    }
 
     // MARK: - ToolConnector
 
     public func listTools() async throws -> [ToolDescriptor] {
+        await acquireOperationSlot()
+        defer { releaseOperationSlot() }
         try await ensureStarted()
         let result = try await request(method: "tools/list", params: [:])
         guard let tools = result["tools"] as? [[String: Any]] else {
@@ -48,6 +80,8 @@ public actor MCPToolConnector: ToolConnector {
     }
 
     public func callTool(name: String, argumentsJSON: String) async throws -> String {
+        await acquireOperationSlot()
+        defer { releaseOperationSlot() }
         try await ensureStarted()
         let arguments: Any
         if argumentsJSON.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -70,8 +104,12 @@ public actor MCPToolConnector: ToolConnector {
         return Self.textContent(from: result)
     }
 
-    /// Terminates the server process. Safe to call multiple times.
+    /// Terminates the server process. Safe to call multiple times. Stdin is
+    /// closed first so well-behaved servers exit on EOF before we signal.
     public func terminate() {
+        if let stdin {
+            try? stdin.fileHandleForWriting.close()
+        }
         if let process, process.isRunning {
             process.terminate()
         }
@@ -85,6 +123,10 @@ public actor MCPToolConnector: ToolConnector {
     /// `readabilityHandler` (GCD), so delivery never parks a Swift concurrency
     /// cooperative-pool thread in a blocking read the way `FileHandle.AsyncBytes`
     /// can under parallel test load.
+    ///
+    /// Inbound data is byte-capped (see `MCPLineBuffer`): a server that floods
+    /// output or sends an unterminated megaline fails the connection instead of
+    /// growing client memory without bound.
     static func makeLineStream(from handle: FileHandle) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let buffer = MCPLineBuffer()
@@ -95,8 +137,13 @@ public actor MCPToolConnector: ToolConnector {
                     continuation.finish()
                     return
                 }
-                for line in buffer.append(data) {
-                    continuation.yield(line)
+                do {
+                    for line in try buffer.append(data) {
+                        continuation.yield(line)
+                    }
+                } catch {
+                    fileHandle.readabilityHandler = nil
+                    continuation.finish(throwing: error)
                 }
             }
             continuation.onTermination = { _ in
@@ -272,14 +319,25 @@ final class MCPLineReader: @unchecked Sendable {
 }
 
 /// Lock-guarded buffer that splits inbound pipe data into newline-delimited lines.
+///
+/// Byte-capped so a hostile or broken server cannot grow client memory without
+/// bound: a single unterminated line may not exceed `maxLineBytes`, and the
+/// total backlog may not exceed `maxBufferedBytes`. Exceeding either cap throws,
+/// which fails the connection.
 final class MCPLineBuffer: @unchecked Sendable {
+    static let maxLineBytes = 1_048_576
+    static let maxBufferedBytes = 8_388_608
+
     private var data = Data()
     private let lock = NSLock()
 
-    func append(_ chunk: Data) -> [String] {
+    func append(_ chunk: Data) throws -> [String] {
         lock.lock()
         defer { lock.unlock() }
         data.append(chunk)
+        if data.count > Self.maxBufferedBytes {
+            throw ToolConnectorError.protocolError("server output exceeded \(Self.maxBufferedBytes) byte backlog cap")
+        }
         var lines: [String] = []
         while let newlineIndex = data.firstIndex(of: 0x0A) {
             if let line = String(data: data[data.startIndex..<newlineIndex], encoding: .utf8) {
@@ -287,6 +345,9 @@ final class MCPLineBuffer: @unchecked Sendable {
             }
             // Rebase through Data(...) so indices always start at zero.
             data = Data(data[data.index(after: newlineIndex)...])
+        }
+        if data.count > Self.maxLineBytes {
+            throw ToolConnectorError.protocolError("server sent an unterminated line over \(Self.maxLineBytes) bytes")
         }
         return lines
     }

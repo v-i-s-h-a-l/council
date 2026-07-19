@@ -281,7 +281,8 @@ struct CLIIntegrationTests {
         #expect(toolCalls.count == 1)
         #expect(toolCalls.first?.payload["operation"] == "listTools")
         #expect(toolCalls.first?.payload["decision"] == "allowed")
-        #expect(toolCalls.first?.payload["server"] == "python3 \(fixture.path)")
+        // Only the executable basename is persisted, never the full command line.
+        #expect(toolCalls.first?.payload["server"] == "python3")
         #expect(try await assembly.memoryService.verifyAuditChain())
     }
 

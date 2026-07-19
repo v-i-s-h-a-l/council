@@ -55,7 +55,11 @@ public struct GrantEnforcingConnector: ToolConnector {
 
     public func listTools() async throws -> [ToolDescriptor] {
         try require(operation: "listTools", toolName: nil)
-        return try await connector.listTools()
+        let tools = try await connector.listTools()
+        // Discovery is filtered to the grant as well: an allowlisted grant
+        // must not learn about tools it cannot invoke.
+        guard let allowedTools = grant.allowedTools else { return tools }
+        return tools.filter { allowedTools.contains($0.name) }
     }
 
     public func callTool(name: String, argumentsJSON: String) async throws -> String {
