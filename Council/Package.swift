@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "CouncilAgents", targets: ["CouncilAgents"]),
         .library(name: "CouncilInference", targets: ["CouncilInference"]),
         .library(name: "CouncilMemory", targets: ["CouncilMemory"]),
+        .library(name: "CouncilTools", targets: ["CouncilTools"]),
         .library(name: "CouncilUI", targets: ["CouncilUI"]),
         .executable(name: "council", targets: ["CouncilCLI"]),
     ],
@@ -87,6 +88,20 @@ let package = Package(
         .target(
             name: "CouncilTestUtilities",
             dependencies: ["CouncilCore"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
+            name: "CouncilTools",
+            dependencies: ["CouncilCore"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .testTarget(
+            name: "CouncilToolsTests",
+            dependencies: ["CouncilTools", "CouncilTestUtilities"],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ]
@@ -167,6 +182,7 @@ let package = Package(
                 "CouncilAgents",
                 "CouncilInference",
                 "CouncilMemory",
+                "CouncilTools",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [

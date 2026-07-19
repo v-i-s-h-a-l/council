@@ -628,4 +628,32 @@ struct CouncilCLITests {
         #expect(boundary.purpose == [.purchaseDeliberation])
         #expect(boundary.deniedPurpose.isEmpty)
     }
+
+    @Test("tools list command parses server and grant options")
+    func parsesToolsList() throws {
+        let command = try ToolsCommand.ListCommand.parse([
+            "--server", "python3 server.py",
+            "--purpose", "purchaseDeliberation",
+            "--tool", "echo",
+            "--tool", "add",
+        ])
+        #expect(command.server == "python3 server.py")
+        #expect(command.purpose == [.purchaseDeliberation])
+        #expect(command.tool == ["echo", "add"])
+        #expect(command.options.format == .text)
+    }
+
+    @Test("tools call command parses arguments")
+    func parsesToolsCall() throws {
+        let command = try ToolsCommand.CallCommand.parse([
+            "echo",
+            "--server", "python3 server.py",
+            "--args", #"{"text": "hi"}"#,
+            "--format", "json",
+        ])
+        #expect(command.name == "echo")
+        #expect(command.args == #"{"text": "hi"}"#)
+        #expect(command.options.format == .json)
+        #expect(command.purpose.isEmpty)
+    }
 }

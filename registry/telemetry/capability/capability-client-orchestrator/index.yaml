@@ -1,3 +1,10 @@
+- event_id: metric-capability-client-orchestrator-2026-07-19T02:54:53.631254+00:00-1
+  timestamp: '2026-07-19T02:54:53.709695+00:00'
+  capability_id: capability-client-orchestrator
+  task_ref: phase5-e
+  outcome: routed
+  accepted: true
+  path: registry/telemetry/capability/capability-client-orchestrator/2026-07-19T02-54-53Z_metrics.yaml
 - event_id: metric-capability-client-orchestrator-2026-07-18T19:51:31.943015+00:00-1
   timestamp: '2026-07-18T19:51:32.120846+00:00'
   capability_id: capability-client-orchestrator
