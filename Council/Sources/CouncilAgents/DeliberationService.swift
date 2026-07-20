@@ -73,6 +73,10 @@ private actor DeliberationActor {
 
     func stateUpdates() -> AsyncStream<DeliberationState> {
         let (stream, continuation) = AsyncStream.makeStream(of: DeliberationState.self)
+        // Finish any prior subscription: replacing the stored continuation
+        // would otherwise leave the old stream hanging forever (leaked storage
+        // and a spinning consumer).
+        stateContinuation?.finish()
         self.stateContinuation = continuation
         continuation.yield(state)
         return stream
@@ -80,6 +84,11 @@ private actor DeliberationActor {
 
     func startSession(question: String) {
         sessionTask?.cancel()
+        // Reset per-session state so a restarted session never inherits the previous
+        // session's ID (which would corrupt audit attribution), its agent outputs,
+        // or its perspective. The fresh state is yielded so subscribers see the reset.
+        state = DeliberationState()
+        stateContinuation?.yield(state)
         sessionTask = Task {
             await runDeliberation(question: question)
         }
@@ -94,22 +103,29 @@ private actor DeliberationActor {
     // MARK: - State machine
 
     private func runDeliberation(question: String) async {
+        // Capture this session's identity. If a newer session starts while this one
+        // is still winding down, every stale state mutation, audit write, and stream
+        // operation from this task must be dropped so it cannot corrupt or terminate
+        // the new session's feed.
+        let sessionID = state.sessionID
         do {
             await appendAudit(
                 category: .sessionStarted,
+                sessionID: sessionID,
                 payload: ["question": question]
             )
-            updateState {
+            updateStateIfCurrent(session: sessionID) {
                 $0.question = question
                 $0.stage = .firstOpinions
             }
-            await appendAudit(category: .stageTransition, payload: ["stage": "firstOpinions"])
+            await appendAudit(category: .stageTransition, sessionID: sessionID, payload: ["stage": "firstOpinions"])
 
-            let chair = Self.resolveChair(from: council)
+            let chair = try Self.resolveChair(from: council)
             let nonChairAgents = council.agents.filter { $0.id != chair.id }
             let purpose = Self.resolvePurpose(from: council)
             await appendAudit(
                 category: .memoryAccess,
+                sessionID: sessionID,
                 payload: [
                     "purpose": purpose.rawValue,
                     "dataElementType": "RoutableProfileContext",
@@ -132,17 +148,18 @@ private actor DeliberationActor {
                 }
                 for try await output in group {
                     firstOpinions.append(output)
-                    updateState { $0.agentOutputs.append(output) }
+                    updateStateIfCurrent(session: sessionID) { $0.agentOutputs.append(output) }
                     await appendAudit(
                         category: .agentCalled,
+                        sessionID: sessionID,
                         payload: ["stage": "firstOpinions", "agentID": output.agentID]
                     )
                 }
             }
 
             // Peer review: each agent reviews all first opinions.
-            updateState { $0.stage = .peerReview }
-            await appendAudit(category: .stageTransition, payload: ["stage": "peerReview"])
+            updateStateIfCurrent(session: sessionID) { $0.stage = .peerReview }
+            await appendAudit(category: .stageTransition, sessionID: sessionID, payload: ["stage": "peerReview"])
             var peerReviews: [AgentOutput] = []
             for agent in nonChairAgents {
                 let output = try await callAgent(
@@ -152,9 +169,10 @@ private actor DeliberationActor {
                     priorOutputs: firstOpinions
                 )
                 peerReviews.append(output)
-                updateState { $0.agentOutputs.append(output) }
+                updateStateIfCurrent(session: sessionID) { $0.agentOutputs.append(output) }
                 await appendAudit(
                     category: .agentCalled,
+                    sessionID: sessionID,
                     payload: ["stage": "peerReview", "agentID": output.agentID]
                 )
             }
@@ -163,6 +181,7 @@ private actor DeliberationActor {
             let routeDecision = await provider.routeSnapshot.asRouteDecision()
             await appendAudit(
                 category: .routeDecision,
+                sessionID: sessionID,
                 payload: [
                     "route": routeDecision.selectedRoute.rawValue,
                     "model": routeDecision.providerMetadata.modelIdentifier,
@@ -173,25 +192,32 @@ private actor DeliberationActor {
                 nonChairAgents: nonChairAgents,
                 question: question,
                 routeDecision: routeDecision,
+                sessionID: sessionID,
                 firstOpinions: firstOpinions,
                 peerReviews: peerReviews
             )
 
+            // A newer session may have superseded this one while it was running;
+            // in that case this task must not touch the shared state or stream.
+            guard state.sessionID == sessionID else { return }
             updateState {
                 $0.stage = .presentation
                 $0.perspective = validatedPerspective
             }
-            await persistResult(question: question, perspective: validatedPerspective)
+            await persistResult(sessionID: sessionID, question: question, perspective: validatedPerspective)
             await appendAudit(
                 category: .perspectiveProduced,
+                sessionID: sessionID,
                 payload: ["summaryLength": "\(validatedPerspective.summary.count)"]
             )
             stateContinuation?.finish()
         } catch is CancellationError {
+            guard state.sessionID == sessionID else { return }
             updateState { $0.stage = .cancelled }
-            await appendAudit(category: .cancellation, payload: [:])
+            await appendAudit(category: .cancellation, sessionID: sessionID, payload: [:])
             stateContinuation?.finish()
         } catch {
+            guard state.sessionID == sessionID else { return }
             let safeError = Self.sanitizedErrorDescription(error)
             updateState {
                 $0.stage = .failed
@@ -199,6 +225,7 @@ private actor DeliberationActor {
             }
             await appendAudit(
                 category: .error,
+                sessionID: sessionID,
                 payload: ["category": safeError]
             )
             stateContinuation?.finish()
@@ -209,10 +236,25 @@ private actor DeliberationActor {
         // Avoid recording raw provider error strings that may contain paths,
         // model identifiers, or other sensitive details. Surface only a stable
         // category derived from the error type.
-        let typeName = String(describing: type(of: error))
         if error is CancellationError {
             return "cancelled"
         }
+        // Classify our own error type explicitly: relying on the type *name*
+        // containing substrings like "Validation" silently mis-categorizes
+        // e.g. `DeliberationError.invalidPerspective` as a generic failure.
+        if let deliberationError = error as? DeliberationError {
+            switch deliberationError {
+            case .invalidPerspective:
+                return "validationFailed"
+            case .thermalCritical:
+                return "thermalLimit"
+            case .inferenceCancelled:
+                return "cancelled"
+            case .noCouncil, .sessionAlreadyActive:
+                return "deliberationFailed"
+            }
+        }
+        let typeName = String(describing: type(of: error))
         if typeName.contains("Thermal") {
             return "thermalLimit"
         }
@@ -230,6 +272,7 @@ private actor DeliberationActor {
         nonChairAgents: [any Agent],
         question: String,
         routeDecision: RouteDecision,
+        sessionID: UUID,
         firstOpinions: [AgentOutput],
         peerReviews: [AgentOutput]
     ) async throws -> Perspective {
@@ -238,24 +281,24 @@ private actor DeliberationActor {
         var synthesisHistory: [AgentOutput] = []
 
         while true {
-            updateState { $0.stage = .synthesis }
+            updateStateIfCurrent(session: sessionID) { $0.stage = .synthesis }
             let chairOutput = try await callAgent(
                 chair,
                 stage: .synthesis,
                 question: question,
                 priorOutputs: priorPool + synthesisHistory
             )
-            updateState { $0.agentOutputs.append(chairOutput) }
+            updateStateIfCurrent(session: sessionID) { $0.agentOutputs.append(chairOutput) }
 
             var perspective = PerspectiveParser.parsePerspective(
                 question: question,
                 routeDecision: routeDecision,
-                auditSessionID: state.sessionID,
+                auditSessionID: sessionID,
                 from: chairOutput.opinion
             )
 
             // Dissent preservation: ask non-chair agents to critique the synthesis.
-            updateState { $0.stage = .dissentPreservation }
+            updateStateIfCurrent(session: sessionID) { $0.stage = .dissentPreservation }
             var dissentOutputs: [AgentOutput] = []
             for agent in nonChairAgents {
                 let output = try await callAgent(
@@ -265,7 +308,7 @@ private actor DeliberationActor {
                     priorOutputs: [chairOutput] + priorPool
                 )
                 dissentOutputs.append(output)
-                updateState { $0.agentOutputs.append(output) }
+                updateStateIfCurrent(session: sessionID) { $0.agentOutputs.append(output) }
             }
             perspective = PerspectiveParser.incorporateDissent(
                 into: perspective,
@@ -355,6 +398,13 @@ private actor DeliberationActor {
         stateContinuation?.yield(state)
     }
 
+    /// Applies `transform` only when `session` is still the current session.
+    /// A superseded session's task must not mutate (or emit) the new session's state.
+    private func updateStateIfCurrent(session: UUID, _ transform: (inout DeliberationState) -> Void) {
+        guard state.sessionID == session else { return }
+        updateState(transform)
+    }
+
     private static func resolvePurpose(from council: any Council) -> AccessPurpose {
         if council is PurchaseCouncil {
             return .purchaseDeliberation
@@ -363,22 +413,26 @@ private actor DeliberationActor {
         return .purchaseDeliberation
     }
 
-    private static func resolveChair(from council: any Council) -> any Agent {
+    private static func resolveChair(from council: any Council) throws -> any Agent {
         if let purchaseCouncil = council as? PurchaseCouncil {
             return purchaseCouncil.chair
         }
         if let chair = council.agents.first(where: { $0.stance == .neutral }) {
             return chair
         }
-        return council.agents.last!
+        if let last = council.agents.last {
+            return last
+        }
+        // An empty council previously crashed the process here via `agents.last!`.
+        throw DeliberationError.noCouncil
     }
 
-    private func appendAudit(category: AuditCategory, payload: [String: String]) async {
+    private func appendAudit(category: AuditCategory, sessionID: UUID, payload: [String: String]) async {
         guard let memoryService else { return }
         do {
             try await memoryService.appendAuditEntry(
                 category: category,
-                sessionID: state.sessionID,
+                sessionID: sessionID,
                 payload: payload
             )
         } catch {
@@ -387,11 +441,11 @@ private actor DeliberationActor {
         }
     }
 
-    private func persistResult(question: String, perspective: Perspective) async {
+    private func persistResult(sessionID: UUID, question: String, perspective: Perspective) async {
         guard let memoryService else { return }
         do {
             try await memoryService.recordEpisode(
-                sessionID: state.sessionID,
+                sessionID: sessionID,
                 question: question,
                 perspective: perspective
             )

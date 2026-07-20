@@ -50,13 +50,15 @@ public actor MemoryService {
     /// Returns recent unlocked episodic gists, newest first.
     public func recentEpisodes(limit: Int = 100) async throws -> [EpisodicGist] {
         let episodes = try await store.episodes(matching: MemoryFilter(locked: false))
-        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
+        // Negative limits would trap in prefix(); clamp defensively.
+        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(max(0, limit)).map { $0 }
     }
 
     /// Searches unlocked episodic gists by question substring, newest first.
     public func searchEpisodes(query: String, limit: Int = 100) async throws -> [EpisodicGist] {
         let episodes = try await store.episodes(matching: MemoryFilter(locked: false, subject: query))
-        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
+        // Negative limits would trap in prefix(); clamp defensively.
+        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(max(0, limit)).map { $0 }
     }
 
     // MARK: - Temporal fact management
@@ -91,7 +93,14 @@ public actor MemoryService {
     /// decision is recorded in the audit log: one aggregate entry for the allowed
     /// facts and one entry per denied fact so users can verify exclusions.
     public func facts(subject: String? = nil, purposes: [AccessPurpose]) async throws -> [TemporalFact] {
+        let now = Date()
+        // Facts outside their validity window are stale: they are neither routed
+        // nor audited as denied — they are simply no longer current.
         let all = try await store.temporalFacts(matching: MemoryFilter(locked: false, subject: subject))
+            .filter { fact in
+                (fact.validFrom.map { $0 <= now } ?? true)
+                    && (fact.validUntil.map { $0 > now } ?? true)
+            }
         let request = Set(purposes)
         var allowed: [TemporalFact] = []
         var denied: [TemporalFact] = []

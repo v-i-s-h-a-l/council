@@ -46,7 +46,17 @@ public actor MLXInferenceProvider: InferenceProvider {
         }
 
         let worker = try await pool.borrow()
-        let innerStream = try await worker.generate(messages: messages, options: options)
+        let innerStream: AsyncThrowingStream<String, Error>
+        do {
+            innerStream = try await worker.generate(messages: messages, options: options)
+        } catch {
+            // The worker-return `defer` below lives inside the stream producer,
+            // which never runs if generate itself throws. Return the worker
+            // here so a failed generate does not leak the pool slot and
+            // permanently exhaust the pool after poolSize failures.
+            await pool.return(worker)
+            throw error
+        }
 
         return AsyncThrowingStream { continuation in
             let producer = Task {

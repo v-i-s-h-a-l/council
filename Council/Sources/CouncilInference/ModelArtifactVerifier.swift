@@ -57,7 +57,14 @@ public struct ModelArtifactVerifier: Sendable {
         }
 
         if expectedHex.contains(",") || expectedHex.contains(";") {
-            let actuals = try filenames.map { try sha256Hex(for: directory.appendingPathComponent($0)) }
+            let actuals: [String]
+            do {
+                actuals = try filenames.map { try sha256Hex(for: directory.appendingPathComponent($0)) }
+            } catch {
+                // An unreadable (or missing) shard is a missing artifact, not
+                // a raw CocoaError escaping to callers.
+                throw ModelArtifactVerifierError.missingArtifacts(id: id)
+            }
             let expectedParts = expectedHex
                 .components(separatedBy: CharacterSet(charactersIn: ",;"))
                 .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -98,8 +105,17 @@ public struct ModelArtifactVerifier: Sendable {
     }
 
     private func shardFilenames(from indexURL: URL, id: String) throws -> [String] {
-        let data = try Data(contentsOf: indexURL)
-        let index = try JSONDecoder().decode(SafetensorsIndex.self, from: data)
+        let index: SafetensorsIndex
+        do {
+            let data = try Data(contentsOf: indexURL)
+            index = try JSONDecoder().decode(SafetensorsIndex.self, from: data)
+        } catch {
+            // A corrupt or unreadable index means the artifact set cannot be
+            // established. Surface it as a verifier error so callers mapping
+            // `ModelArtifactVerifierError` (e.g. `ModelContainerPool.borrow`)
+            // never see a raw `DecodingError`/`CocoaError` escape.
+            throw ModelArtifactVerifierError.missingArtifacts(id: id)
+        }
         let filenames = Array(Set(index.weightMap.values)).sorted()
         // Reject paths that try to escape the model directory.
         for filename in filenames {

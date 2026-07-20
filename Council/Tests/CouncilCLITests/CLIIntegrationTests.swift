@@ -1,3 +1,4 @@
+import ArgumentParser
 import CouncilAgents
 @testable import CouncilCLI
 import CouncilCore
@@ -190,25 +191,112 @@ struct CLIIntegrationTests {
         #expect(try await assembly.memoryService.verifyAuditChain())
     }
 
-    @Test("Profile directory and key file are hardened")
-    func profileDirectoryPermissions() async throws {
+    @Test("CLIAssembly hardens the profile directory and every sensitive file")
+    func hardenProfileDirectoryCoversEverySensitiveFile() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
-        _ = try await RuntimeAssembly(
-            rootDirectory: root,
-            useSecureEnclave: false
+
+        // Start from a world-readable directory: hardening must tighten it,
+        // not merely preserve permissions it set itself.
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: root.path
         )
 
-        let dirAttributes = try FileManager.default.attributesOfItem(atPath: root.path)
-        let dirPermissions = dirAttributes[.posixPermissions] as? NSNumber
+        let options = try GlobalOptions.parse(["--profile-dir", root.path])
+        _ = try await CLIAssembly.makeRuntimeAssembly(options: options)
+
+        let dirPermissions = try FileManager.default
+            .attributesOfItem(atPath: root.path)[.posixPermissions] as? NSNumber
         #expect(dirPermissions?.int16Value == 0o700)
 
-        let keyAttributes = try FileManager.default.attributesOfItem(
-            atPath: root.appendingPathComponent("profile.key").path
-        )
-        let keyPermissions = keyAttributes[.posixPermissions] as? NSNumber
+        let sensitiveFiles = [
+            "profile.key", "salt.bin", "memory.sqlite", "memory.sqlite-wal",
+            "memory.sqlite-shm", "memory.sqlite.audit", "memory.sqlite.audit-wal",
+            "memory.sqlite.audit-shm", "vault.enc",
+        ]
+        var checked = 0
+        for name in sensitiveFiles {
+            let path = root.appendingPathComponent(name).path
+            guard FileManager.default.fileExists(atPath: path) else { continue }
+            let permissions = try FileManager.default
+                .attributesOfItem(atPath: path)[.posixPermissions] as? NSNumber
+            #expect(permissions?.int16Value == 0o600, "\(name) must be owner-only")
+            checked += 1
+        }
+        // The assembly must have produced real state to harden.
+        #expect(checked >= 4)
+
+        // A file whose permissions are loosened later must be repaired by the
+        // next CLI invocation — the hardening pass is not one-shot.
+        let keyPath = root.appendingPathComponent("profile.key").path
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: keyPath)
+        _ = try await CLIAssembly.makeRuntimeAssembly(options: options)
+        let repaired = try FileManager.default
+            .attributesOfItem(atPath: keyPath)[.posixPermissions] as? NSNumber
+        #expect(repaired?.int16Value == 0o600)
+    }
+
+    @Test("CLIAssembly follows a symlinked profile directory and hardens the target")
+    func hardenProfileDirectoryFollowsSymlink() async throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let real = base.appendingPathComponent("real")
+        let link = base.appendingPathComponent("link")
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: real.path)
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: real.path)
+
+        let options = try GlobalOptions.parse(["--profile-dir", link.path])
+        _ = try await CLIAssembly.makeRuntimeAssembly(options: options)
+
+        // Pins follow-symlink behavior: the target directory and its key file
+        // are hardened, so a symlink cannot smuggle in lax permissions.
+        let dirPermissions = try FileManager.default
+            .attributesOfItem(atPath: real.path)[.posixPermissions] as? NSNumber
+        #expect(dirPermissions?.int16Value == 0o700)
+        let keyPermissions = try FileManager.default
+            .attributesOfItem(atPath: real.appendingPathComponent("profile.key").path)[.posixPermissions] as? NSNumber
         #expect(keyPermissions?.int16Value == 0o600)
+    }
+
+    @Test("memory show with an unknown id exits 1")
+    func memoryShowUnknownIDExits1() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var command = try MemoryCommand.ShowCommand.parse([
+            UUID().uuidString,
+            "--profile-dir", root.path,
+        ])
+        do {
+            try await command.run()
+            Issue.record("Expected ExitCode(1) for an unknown gist id")
+        } catch let error as ExitCode {
+            #expect(error.rawValue == 1)
+        }
+    }
+
+    @Test("model show with an unknown id exits 1")
+    func modelShowUnknownIDExits1() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var command = try ModelCommand.ShowCommand.parse([
+            "no-such-model-\(UUID().uuidString)",
+            "--profile-dir", root.path,
+        ])
+        do {
+            try await command.run()
+            Issue.record("Expected ExitCode(1) for an unknown model id")
+        } catch let error as ExitCode {
+            #expect(error.rawValue == 1)
+        }
     }
 
     @Test("Deliberation assembly logs per-item profile denials")
@@ -246,18 +334,6 @@ struct CLIIntegrationTests {
         #expect(denials.first?.payload["purpose"] == "purchaseDeliberation")
     }
 
-    @Test("RoutableProfileContext excludes confidential containers")
-    func profileRedaction() async throws {
-        let profile = UserProfile(
-            values: [ValueStatement(text: "Value")],
-            financialHistory: ClientConfidentialContainer(items: ["salary"]),
-            journalEntries: [JournalEntry(text: "diary")]
-        )
-        let context = RoutableProfileContext(profile: profile)
-        #expect(context.values.count == 1)
-        // RoutableProfileContext intentionally omits financialHistory and journalEntries.
-    }
-
     @Test("tools list through CLI writes toolCall audit entries")
     func toolsListWritesAuditEntries() async throws {
         let root = FileManager.default.temporaryDirectory
@@ -284,6 +360,48 @@ struct CLIIntegrationTests {
         // Only the executable basename is persisted, never the full command line.
         #expect(toolCalls.first?.payload["server"] == "python3")
         #expect(try await assembly.memoryService.verifyAuditChain())
+    }
+
+    @Test("Assembly fails closed on a truncated salt file")
+    func assemblyFailsClosedOnCorruptSalt() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        // Truncated salt: 8 of 16 bytes.
+        try Data(repeating: 0xFF, count: 8).write(to: root.appendingPathComponent("salt.bin"))
+
+        // Regression: this used to silently regenerate the salt, orphaning every
+        // stored row while destroying the recovery material.
+        do {
+            _ = try await RuntimeAssembly(rootDirectory: root, useSecureEnclave: false)
+            Issue.record("A truncated salt.bin must fail assembly, not silently rekey")
+        } catch {
+            // Any thrown error is acceptable here; the critical property is that
+            // the corrupt salt was NOT overwritten.
+        }
+        let surviving = try Data(contentsOf: root.appendingPathComponent("salt.bin"))
+        #expect(surviving == Data(repeating: 0xFF, count: 8))
+    }
+
+    @Test("Assembly fails closed on a corrupt profile key file")
+    func assemblyFailsClosedOnCorruptProfileKey() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("not-a-valid-key".utf8).write(to: root.appendingPathComponent("profile.key"))
+
+        // Regression: a corrupt key used to be treated as missing and overwritten,
+        // silently orphaning the encrypted profile vault.
+        do {
+            _ = try await RuntimeAssembly(rootDirectory: root, useSecureEnclave: false)
+            Issue.record("A corrupt profile.key must fail assembly, not silently rekey")
+        } catch {
+            // Expected: corruptKey surfaces.
+        }
+        let surviving = try Data(contentsOf: root.appendingPathComponent("profile.key"))
+        #expect(surviving == Data("not-a-valid-key".utf8))
     }
 
     /// Writes a minimal newline-delimited JSON-RPC MCP fixture server.

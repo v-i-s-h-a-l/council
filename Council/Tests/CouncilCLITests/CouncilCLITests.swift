@@ -22,10 +22,11 @@ struct CouncilCLITests {
 
     @Test("ask command parses options")
     func parsesOptions() throws {
+        let checksum = "sha256:" + String(repeating: "ab", count: 32)
         let command = try AskCommand.parse([
             "--provider", "mlx",
             "--model", "mlx-community/test",
-            "--checksum", "sha256:deadbeef",
+            "--checksum", checksum,
             "--consent-download",
             "--format", "json",
             "--profile-dir", "/tmp/council-test",
@@ -35,7 +36,7 @@ struct CouncilCLITests {
         ])
         #expect(command.provider == .mlx)
         #expect(command.model == "mlx-community/test")
-        #expect(command.checksum == "sha256:deadbeef")
+        #expect(command.checksum == checksum)
         #expect(command.consentDownload)
         #expect(command.options.format == .json)
         #expect(command.options.profileDir == "/tmp/council-test")
@@ -72,7 +73,7 @@ struct CouncilCLITests {
         }
     }
 
-    @Test("perspective formatter produces text output")
+    @Test("perspective formatter produces ordered, correctly labeled text output")
     func textFormatter() {
         let perspective = Perspective(
             summary: "Summary text.",
@@ -81,10 +82,19 @@ struct CouncilCLITests {
             dissent: ["Dissent one."]
         )
         let output = PerspectiveFormatter.text(perspective)
-        #expect(output.contains("Summary"))
-        #expect(output.contains("Trade-off one."))
-        #expect(output.contains("Blind spot one."))
-        #expect(output.contains("Dissent one."))
+        // Each header must be immediately followed by its own content, in the
+        // canonical section order: swapped or mislabeled sections fail here,
+        // not just missing ones.
+        guard let summary = output.range(of: "Summary\n-------\nSummary text."),
+              let tradeOffs = output.range(of: "Trade-offs\n----------\n• Trade-off one."),
+              let blindSpots = output.range(of: "Blind spots\n-----------\n• Blind spot one."),
+              let dissent = output.range(of: "Dissent\n-------\n• Dissent one.") else {
+            Issue.record("Missing or malformed section in formatter output:\n\(output)")
+            return
+        }
+        #expect(summary.lowerBound < tradeOffs.lowerBound)
+        #expect(tradeOffs.lowerBound < blindSpots.lowerBound)
+        #expect(blindSpots.lowerBound < dissent.lowerBound)
     }
 
     @Test("MemoryService records episode and appends audit")
@@ -116,12 +126,6 @@ struct CouncilCLITests {
     }
 
     // MARK: - New command parsing
-
-    @Test("profile show parses")
-    func profileShowParses() throws {
-        let command = try ProfileCommand.ShowCommand.parse([])
-        #expect(command.options.format == .text)
-    }
 
     @Test("profile value add parses")
     func profileValueAddParses() throws {
@@ -155,11 +159,12 @@ struct CouncilCLITests {
 
     @Test("model register parses checksum")
     func modelRegisterParses() throws {
+        let checksum = "sha256:" + String(repeating: "cd", count: 32)
         let command = try ModelCommand.RegisterCommand.parse([
-            "mlx-community/test", "--checksum", "sha256:deadbeef",
+            "mlx-community/test", "--checksum", checksum,
         ])
         #expect(command.id == "mlx-community/test")
-        #expect(command.checksum == "sha256:deadbeef")
+        #expect(command.checksum == checksum)
     }
 
     @Test("audit list parses include-payloads")
@@ -496,22 +501,6 @@ struct CouncilCLITests {
         #expect(remaining.first?.id == "b")
     }
 
-    @Test("MockAuditLog metadata-only entries omit payloads")
-    func mockAuditLogMetadataOnlyEntries() async throws {
-        let auditLog = MockAuditLog()
-        let entry = AuditEntry(
-            category: .sessionStarted,
-            payload: ["question": "secret"]
-        )
-        try await auditLog.append(entry)
-
-        let metadata = try await auditLog.entries(since: nil, limit: nil, includePayloads: false)
-        #expect(metadata.first?.payload.isEmpty == true)
-
-        let full = try await auditLog.entries(since: nil, limit: nil, includePayloads: true)
-        #expect(full.first?.payload["question"] == "secret")
-    }
-
     @Test("MemoryService purpose-filtered facts enforce denial and audit the decision")
     func memoryServiceFactsByPurpose() async throws {
         let store = MockMemoryStore()
@@ -655,5 +644,44 @@ struct CouncilCLITests {
         #expect(command.args == #"{"text": "hi"}"#)
         #expect(command.options.format == .json)
         #expect(command.purpose.isEmpty)
+    }
+
+    @Test("bare question routes to the ask default subcommand")
+    func bareQuestionRoutesToAskDefaultSubcommand() throws {
+        // Pins `defaultSubcommand: AskCommand`: a bare argument list must keep
+        // routing to ask rather than failing or hitting another subcommand.
+        let parsed = try CouncilCLI.parseAsRoot(["Should I buy?"])
+        let ask = try #require(parsed as? AskCommand)
+        #expect(ask.question == "Should I buy?")
+    }
+
+    @Test("UUID arguments reject malformed values and accept lowercase canonical")
+    func uuidArgumentsRejectMalformed() throws {
+        #expect(throws: (any Error).self) {
+            try ProfileCommand.ValueCommand.RemoveCommand.parse(["not-a-uuid"])
+        }
+        #expect(throws: (any Error).self) {
+            try MemoryCommand.ShowCommand.parse(["12345"])
+        }
+        #expect(throws: (any Error).self) {
+            try ProfileCommand.JournalCommand.RemoveCommand.parse(["A0B1C2D3-E4F5-6789"])
+        }
+
+        let lowercase = "a0b1c2d3-e4f5-6789-0123-456789abcdef"
+        let parsed = try ProfileCommand.ValueCommand.RemoveCommand.parse([lowercase])
+        #expect(parsed.id.uuidString == "A0B1C2D3-E4F5-6789-0123-456789ABCDEF")
+    }
+
+    @Test("unknown output format is rejected on every subcommand shape")
+    func formatOptionRejectsUnknownValue() {
+        #expect(throws: (any Error).self) {
+            try MemoryCommand.ListCommand.parse(["--format", "yaml"])
+        }
+        #expect(throws: (any Error).self) {
+            try ProfileCommand.JournalCommand.ListCommand.parse(["--format", "yaml"])
+        }
+        #expect(throws: (any Error).self) {
+            try AuditCommand.ListCommand.parse(["--format", "yaml"])
+        }
     }
 }

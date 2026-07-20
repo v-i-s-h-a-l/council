@@ -32,37 +32,44 @@ extension ProfileCommand {
 
             switch options.format {
             case .text, .markdown:
-                var lines: [String] = []
-                lines.append("Values:")
-                for value in profile.values {
-                    let tags = value.tags.isEmpty ? "" : " [\(value.tags.joined(separator: ", "))]"
-                    lines.append("  \(value.id): \(value.text)\(tags)")
-                }
-                lines.append("")
-                lines.append("Goals:")
-                for goal in profile.goals {
-                    let timeframe = goal.timeframe.map { " (\($0))" } ?? ""
-                    let status = goal.status.map { " [\($0.rawValue)]" } ?? ""
-                    let tags = goal.tags.isEmpty ? "" : " [\(goal.tags.joined(separator: ", "))]"
-                    lines.append("  \(goal.id): \(goal.text)\(timeframe)\(status)\(tags)")
-                }
-                lines.append("")
-                lines.append("Boundaries:")
-                for boundary in profile.boundaries {
-                    let severity = boundary.severity.map { " [\($0.rawValue)]" } ?? ""
-                    let tags = boundary.tags.isEmpty ? "" : " [\(boundary.tags.joined(separator: ", "))]"
-                    lines.append("  \(boundary.id): \(boundary.text)\(severity)\(tags)")
-                }
-                lines.append("")
-                lines.append("Journal: \(profile.journalEntries.count) confidential entr\(profile.journalEntries.count == 1 ? "y" : "ies") (use `profile journal` to inspect)")
-                lines.append("Financial: \(profile.financialHistory.items.count) confidential record\(profile.financialHistory.items.count == 1 ? "" : "s")")
-                print(lines.joined(separator: "\n"))
+                print(formatProfileShowText(profile))
             case .json:
                 let context = RoutableProfileContext(profile: profile)
                 print(try CLIEncoder.json(context))
             }
         }
     }
+}
+
+/// Renders the profile for `profile show` text output. Journal entries and
+/// financial history are confidential: only their counts are ever shown,
+/// never their contents.
+func formatProfileShowText(_ profile: UserProfile) -> String {
+    var lines: [String] = []
+    lines.append("Values:")
+    for value in profile.values {
+        let tags = value.tags.isEmpty ? "" : " [\(value.tags.joined(separator: ", "))]"
+        lines.append("  \(value.id): \(value.text)\(tags)")
+    }
+    lines.append("")
+    lines.append("Goals:")
+    for goal in profile.goals {
+        let timeframe = goal.timeframe.map { " (\($0))" } ?? ""
+        let status = goal.status.map { " [\($0.rawValue)]" } ?? ""
+        let tags = goal.tags.isEmpty ? "" : " [\(goal.tags.joined(separator: ", "))]"
+        lines.append("  \(goal.id): \(goal.text)\(timeframe)\(status)\(tags)")
+    }
+    lines.append("")
+    lines.append("Boundaries:")
+    for boundary in profile.boundaries {
+        let severity = boundary.severity.map { " [\($0.rawValue)]" } ?? ""
+        let tags = boundary.tags.isEmpty ? "" : " [\(boundary.tags.joined(separator: ", "))]"
+        lines.append("  \(boundary.id): \(boundary.text)\(severity)\(tags)")
+    }
+    lines.append("")
+    lines.append("Journal: \(profile.journalEntries.count) confidential entr\(profile.journalEntries.count == 1 ? "y" : "ies") (use `profile journal` to inspect)")
+    lines.append("Financial: \(profile.financialHistory.items.count) confidential record\(profile.financialHistory.items.count == 1 ? "" : "s")")
+    return lines.joined(separator: "\n")
 }
 
 // MARK: - Value
@@ -319,15 +326,12 @@ extension ProfileCommand.JournalCommand {
             if stdin || text == nil {
                 body = try readStdin()
             } else {
-                body = text!
+                body = try validatedJournalBody(text!)
             }
 
             let createdAt: Date
             if let date {
-                guard let parsed = ISO8601DateFormatter().date(from: date) else {
-                    throw ValidationError("Invalid date format: expected ISO-8601 (e.g., 2026-07-09T12:00:00Z).")
-                }
-                createdAt = parsed
+                createdAt = try parseISODate(date)
             } else {
                 createdAt = Date()
             }
@@ -365,6 +369,14 @@ extension ProfileCommand.JournalCommand {
 
         @Option(name: .shortAndLong, help: "Maximum number of entries to show.")
         var limit: Int?
+
+        func validate() throws {
+            // A negative limit silently yields no entries, which makes
+            // `formatJournalListText` print the misleading "No journal entries."
+            if let limit, limit < 0 {
+                throw ValidationError("--limit must be greater than or equal to 0.")
+            }
+        }
 
         func run() async throws {
             let fromDate = try from.map { try parseISODate($0) }
@@ -425,14 +437,24 @@ private func readStdin() throws -> String {
     while let line = readLine(strippingNewline: false) {
         input.append(line)
     }
-    guard !input.isEmpty else {
+    return try validatedJournalBody(input)
+}
+
+/// Returns the journal body unchanged, rejecting empty or whitespace-only
+/// input so a stray pipe or blank argument cannot create an empty
+/// confidential entry.
+func validatedJournalBody(_ input: String) throws -> String {
+    guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         throw ValidationError("Journal entry text is required.")
     }
     return input
 }
 
 func parseISODate(_ value: String) throws -> Date {
-    guard let date = ISO8601DateFormatter().date(from: value) else {
+    // Accept fractional seconds for parity with `audit list --since`.
+    let withFractionalSeconds = ISO8601DateFormatter()
+    withFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    guard let date = withFractionalSeconds.date(from: value) ?? ISO8601DateFormatter().date(from: value) else {
         throw ValidationError("Invalid date format: expected ISO-8601 (e.g., 2026-07-09T12:00:00Z).")
     }
     return date

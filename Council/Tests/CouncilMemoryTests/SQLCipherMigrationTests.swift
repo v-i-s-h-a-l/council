@@ -1,6 +1,5 @@
 import CouncilCore
 @testable import CouncilMemory
-import CryptoKit
 import Foundation
 import GRDB
 import Testing
@@ -23,11 +22,24 @@ struct SQLCipherMigrationTests {
     }
 
     /// Creates a legacy (plaintext) database at the given path with known data.
-    private func createLegacyDatabase(at path: String) throws -> (episodeIDs: [UUID], factIDs: [UUID], auditIDs: [UUID]) {
-        let dbQueue = try DatabaseQueue(path: path)
-        try DatabaseMigrator.migrator().migrate(dbQueue)
-
-        let key = GRDBMemoryStore.deriveDatabaseKey(from: profileKey, salt: salt)
+    ///
+    /// Built through the real store and audit-log implementations so the migration
+    /// is tested against a realistic legacy artifact — including a genuine
+    /// HMAC-chained audit entry — instead of a hand-rolled reimplementation of the
+    /// audit canonicalization.
+    private func createLegacyDatabase(at path: String) async throws -> (episodeIDs: [UUID], factIDs: [UUID], auditIDs: [UUID]) {
+        let auditLog = try await GRDBAuditLog.make(
+            path: path,
+            profileKey: profileKey,
+            salt: salt,
+            useSQLCipher: false
+        )
+        let store = try GRDBMemoryStore(
+            dbQueue: await auditLog.dbQueue,
+            profileKey: profileKey,
+            salt: salt,
+            useSQLCipher: false
+        )
 
         let episode = EpisodicGist(
             sessionID: UUID(),
@@ -45,56 +57,17 @@ struct SQLCipherMigrationTests {
             object: "memory.sqlite",
             accessScope: [.purchaseDeliberation]
         )
+        try await store.saveEpisode(episode)
+        try await store.saveFact(fact)
 
-        var episodeRecord = try EpisodicGistRecord(episode: episode, key: key)
-        var factRecord = try TemporalFactRecord(fact: fact, key: key)
-
-        // Create an audit entry with valid HMAC chain.
-        let auditKey = Self.deriveAuditKey(from: profileKey)
-        let genesisHash = SHA256.hash(data: Data("COUNCIL_AUDIT_GENESIS_v1".utf8))
-            .map { String(format: "%02x", $0) }.joined()
-        var auditEntry = AuditEntry(
+        let auditEntry = AuditEntry(
             sessionID: UUID(),
-            timestamp: Date(),
             category: .sessionStarted,
-            payload: ["test": "migration"],
-            previousHash: genesisHash,
-            hmac: ""
+            payload: ["test": "migration"]
         )
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let sortedPayload = auditEntry.payload.sorted { $0.key < $1.key }
-        let payloadObject: [String: String] = Dictionary(uniqueKeysWithValues: sortedPayload)
-        let object: [String: Any] = [
-            "id": auditEntry.id.uuidString,
-            "timestamp": formatter.string(from: auditEntry.timestamp),
-            "category": auditEntry.category.rawValue,
-            "payload": payloadObject,
-            "previousHash": auditEntry.previousHash,
-        ]
-        let canonicalData = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
-        let code = HMAC<SHA256>.authenticationCode(for: canonicalData, using: auditKey)
-        auditEntry.hmac = code.map { String(format: "%02x", $0) }.joined()
-
-        var auditRecord = try AuditLogRecord(entry: auditEntry, key: auditKey)
-
-        try dbQueue.write { db in
-            try episodeRecord.insert(db)
-            try factRecord.insert(db)
-            try auditRecord.insert(db)
-        }
+        try await auditLog.append(auditEntry)
 
         return ([episode.id], [fact.id], [auditEntry.id])
-    }
-
-    private static func deriveAuditKey(from profileKey: Data) -> SymmetricKey {
-        let inputKey = SymmetricKey(data: profileKey)
-        let info = Data("com.council.audit.integrity.v1".utf8)
-        return HKDF<SHA256>.deriveKey(
-            inputKeyMaterial: inputKey,
-            info: info,
-            outputByteCount: 32
-        )
     }
 
     // MARK: - Detection
@@ -198,26 +171,6 @@ struct SQLCipherMigrationTests {
         #expect(facts.first?.object == "roundtrip")
     }
 
-    @Test func sqlCipherInMemoryDatabaseWorks() async throws {
-        // In-memory databases should work with SQLCipher key.
-        let dbQueue = try DatabaseQueue()
-        let store = try GRDBMemoryStore(
-            dbQueue: dbQueue,
-            profileKey: profileKey,
-            salt: salt,
-            useSQLCipher: true
-        )
-        let fact = TemporalFact(
-            subject: "user",
-            predicate: "memory",
-            object: "in-memory-test",
-            accessScope: [.purchaseDeliberation]
-        )
-        try await store.saveFact(fact)
-        let facts = try await store.temporalFacts(matching: MemoryFilter())
-        #expect(facts.count == 1)
-    }
-
     // MARK: - Migration
 
     @Test func migratePreservesAllData() async throws {
@@ -226,7 +179,7 @@ struct SQLCipherMigrationTests {
         let dbPath = dir.appendingPathComponent("memory.sqlite").path
 
         // Create legacy database with known data.
-        let (episodeIDs, factIDs, auditIDs) = try createLegacyDatabase(at: dbPath)
+        let (episodeIDs, factIDs, auditIDs) = try await createLegacyDatabase(at: dbPath)
 
         // Run migration.
         let result = try SQLCipherMigration.migrate(
@@ -282,13 +235,13 @@ struct SQLCipherMigrationTests {
         }
     }
 
-    @Test func rollbackRestoresLegacyDatabase() throws {
+    @Test func rollbackRestoresLegacyDatabase() async throws {
         let dir = try makeTempDir()
         defer { cleanup(dir) }
         let dbPath = dir.appendingPathComponent("memory.sqlite").path
 
         // Create and migrate legacy database.
-        _ = try createLegacyDatabase(at: dbPath)
+        _ = try await createLegacyDatabase(at: dbPath)
         let result = try SQLCipherMigration.migrate(
             legacyPath: dbPath,
             profileKey: profileKey,
@@ -308,23 +261,66 @@ struct SQLCipherMigrationTests {
 
         // Legacy database should be back and readable without key.
         let plainQueue = try DatabaseQueue(path: dbPath)
-        let facts = try plainQueue.read { db in
+        let facts = try await plainQueue.read { db in
             try TemporalFactRecord.fetchAll(db)
         }
         #expect(facts.count == 1)
     }
 
-    @Test func markerFileContentsAreCorrect() throws {
+    @Test func migrateTwiceFailsCleanlyAndPreservesData() async throws {
         let dir = try makeTempDir()
         defer { cleanup(dir) }
         let dbPath = dir.appendingPathComponent("memory.sqlite").path
 
-        _ = try createLegacyDatabase(at: dbPath)
-        try SQLCipherMigration.migrate(legacyPath: dbPath, profileKey: profileKey, salt: salt)
+        _ = try await createLegacyDatabase(at: dbPath)
+        let result = try SQLCipherMigration.migrate(
+            legacyPath: dbPath,
+            profileKey: profileKey,
+            salt: salt
+        )
+        #expect(SQLCipherMigration.isMigrated(at: dbPath))
 
-        let markerPath = dbPath + ".sqlcipher"
-        let contents = try String(contentsOfFile: markerPath, encoding: .utf8)
-        #expect(contents.contains("sqlcipher-v1"))
+        // Second run: the legacy path now holds an encrypted database, so migration
+        // must fail loudly — and leave the working database, backup, and marker intact.
+        #expect(throws: SQLCipherMigration.MigrationError.self) {
+            try SQLCipherMigration.migrate(legacyPath: dbPath, profileKey: profileKey, salt: salt)
+        }
+
+        #expect(SQLCipherMigration.isMigrated(at: dbPath))
+        #expect(FileManager.default.fileExists(atPath: result.backupPath))
+        #expect(!FileManager.default.fileExists(atPath: dbPath + ".next"))
+
+        let store = try await GRDBMemoryStore.make(
+            path: dbPath,
+            profileKey: profileKey,
+            salt: salt,
+            useSQLCipher: true
+        )
+        #expect(try await store.episodes(matching: MemoryFilter()).count == 1)
+        #expect(try await store.temporalFacts(matching: MemoryFilter()).count == 1)
+        let auditRecords = try await store.dbQueue.read { db in
+            try AuditLogRecord.fetchAll(db)
+        }
+        #expect(auditRecords.count == 1)
+    }
+
+    @Test func migrationFailureLeavesLegacyDatabaseUntouched() throws {
+        let dir = try makeTempDir()
+        defer { cleanup(dir) }
+        let dbPath = dir.appendingPathComponent("memory.sqlite").path
+
+        // A "legacy database" that is not a database at all cannot be opened.
+        let garbage = Data("definitely not sqlite".utf8)
+        try garbage.write(to: URL(fileURLWithPath: dbPath))
+
+        #expect(throws: SQLCipherMigration.MigrationError.self) {
+            try SQLCipherMigration.migrate(legacyPath: dbPath, profileKey: profileKey, salt: salt)
+        }
+
+        // The original file is byte-identical, and no marker or partial output remains.
+        #expect(try Data(contentsOf: URL(fileURLWithPath: dbPath)) == garbage)
+        #expect(!SQLCipherMigration.isMigrated(at: dbPath))
+        #expect(!FileManager.default.fileExists(atPath: dbPath + ".next"))
     }
 
     // MARK: - Audit Log with SQLCipher

@@ -68,9 +68,16 @@ public actor MCPToolConnector: ToolConnector {
             throw ToolConnectorError.protocolError("tools/list response missing 'tools' array")
         }
         return tools.map { entry in
-            let schema = entry["inputSchema"]
-            let schemaString = (try? JSONSerialization.data(withJSONObject: schema ?? NSNull()))
-                .flatMap { String(data: $0, encoding: .utf8) }
+            // Only serialize genuine JSON objects/arrays: passing NSNull (or a
+            // scalar) as the top level raises an NSException on Darwin, which
+            // try? cannot catch — a malformed server would abort the process.
+            let schemaString: String?
+            if let schema = entry["inputSchema"], JSONSerialization.isValidJSONObject(schema),
+               let data = try? JSONSerialization.data(withJSONObject: schema) {
+                schemaString = String(data: data, encoding: .utf8)
+            } else {
+                schemaString = nil
+            }
             return ToolDescriptor(
                 name: entry["name"] as? String ?? "",
                 description: entry["description"] as? String,
@@ -88,7 +95,12 @@ public actor MCPToolConnector: ToolConnector {
             arguments = [String: Any]()
         } else {
             let data = Data(argumentsJSON.utf8)
-            let parsed = try JSONSerialization.jsonObject(with: data)
+            let parsed: Any
+            do {
+                parsed = try JSONSerialization.jsonObject(with: data)
+            } catch {
+                throw ToolConnectorError.protocolError("arguments are not valid JSON")
+            }
             guard let object = parsed as? [String: Any] else {
                 throw ToolConnectorError.protocolError("arguments must be a JSON object")
             }
@@ -274,8 +286,11 @@ public actor MCPToolConnector: ToolConnector {
         try await withThrowingTaskGroup(of: T.self) { group in
             group.addTask(operation: operation)
             group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw ToolConnectorError.timeout("no response to '\(method)' within \(Int(seconds))s")
+                // Clamp before converting: UInt64(_: Double) traps on negative,
+                // NaN, or out-of-range timeouts, taking down the whole process.
+                let nanoseconds = Self.timeoutNanoseconds(seconds)
+                try await Task.sleep(nanoseconds: nanoseconds)
+                throw ToolConnectorError.timeout("no response to '\(method)' within \(nanoseconds / 1_000_000_000)s")
             }
             guard let result = try await group.next() else {
                 group.cancelAll()
@@ -284,6 +299,15 @@ public actor MCPToolConnector: ToolConnector {
             group.cancelAll()
             return result
         }
+    }
+
+    /// Converts a timeout to nanoseconds without trapping on out-of-range
+    /// inputs: non-positive and NaN timeouts become 0 (the request times out
+    /// immediately); infinite or huge timeouts clamp to `UInt64.max`.
+    private static func timeoutNanoseconds(_ seconds: TimeInterval) -> UInt64 {
+        if seconds.isNaN || seconds <= 0 { return 0 }
+        let nanos = seconds * 1_000_000_000
+        return nanos >= 18_446_744_073_709_551_616.0 ? UInt64.max : UInt64(nanos) // 2^64
     }
 
     private static func textContent(from result: [String: Any]) -> String {

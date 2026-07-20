@@ -24,7 +24,8 @@ public actor MockAuditLog: AuditLog {
             filtered = filtered.filter { $0.timestamp >= since }
         }
         let sorted = filtered.sorted { $0.timestamp > $1.timestamp }
-        let limited = limit.map { Array(sorted.prefix($0)) } ?? sorted
+        // Negative limits would trap in prefix(); clamp like GRDBAuditLog.
+        let limited = limit.map { Array(sorted.prefix(max(0, $0))) } ?? sorted
         if includePayloads {
             return limited
         }

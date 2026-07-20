@@ -43,8 +43,11 @@ struct AskCommand: AsyncParsableCommand {
             guard model != nil else {
                 throw ValidationError("--model is required when --provider is mlx.")
             }
-            guard checksum != nil else {
+            guard let checksum else {
                 throw ValidationError("--checksum is required when --provider is mlx.")
+            }
+            guard isValidSHA256Checksum(checksum) else {
+                throw ValidationError("--checksum must be a SHA-256 hex digest (64 hex characters, optionally prefixed with sha256:).")
             }
         }
     }
@@ -125,7 +128,7 @@ struct AskCommand: AsyncParsableCommand {
         print(output)
     }
 
-    private static func makeInferenceProvider(
+    static func makeInferenceProvider(
         provider: Provider,
         model: String?,
         checksum: String?,
@@ -144,18 +147,37 @@ struct AskCommand: AsyncParsableCommand {
             }
             let modelID = modelConfig.modelConfiguration.name
 
-            await manifestService.register(
-                ModelManifest(id: modelID, checksum: checksum)
-            )
+            // Consent is bound to the model artifacts it was granted for. If the
+            // registered checksum changed since consent was given (model bits
+            // swapped under the same id), the old consent must not be inherited:
+            // require explicit re-consent instead of silently downloading a
+            // different artifact than the user approved. Registration only
+            // happens once consent is settled, so a rejected run leaves no
+            // phantom manifest behind.
+            let previous = await manifestService.manifest(id: modelID)
+            let checksumChanged = previous != nil
+                && previous?.checksum.map(normalizedSHA256Digest) != checksum.map(normalizedSHA256Digest)
 
-            let alreadyConsented = await manifestService.isModelConsented(id: modelID)
             if consentDownload {
+                await manifestService.register(
+                    ModelManifest(id: modelID, checksum: checksum)
+                )
                 await manifestService.grantConsent(id: modelID)
-            } else if !alreadyConsented {
+            } else if checksumChanged {
                 CLIAssembly.writeToStderr(
-                    "MLX provider requires explicit consent. Pass --consent-download or run 'council model consent \(modelID)'.\n"
+                    "Checksum for \(modelID) changed since consent was granted. Re-consent with --consent-download or run 'council model consent \(modelID)'.\n"
                 )
                 throw ExitCode(64)
+            } else {
+                guard await manifestService.isModelConsented(id: modelID) else {
+                    CLIAssembly.writeToStderr(
+                        "MLX provider requires explicit consent. Pass --consent-download or run 'council model consent \(modelID)'.\n"
+                    )
+                    throw ExitCode(64)
+                }
+                await manifestService.register(
+                    ModelManifest(id: modelID, checksum: checksum)
+                )
             }
 
             let pool = ModelContainerPool(

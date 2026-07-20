@@ -58,7 +58,10 @@ public actor RuntimeAssembly {
         let rawKey: Data
         do {
             rawKey = try await keyManager.unwrapKey()
-        } catch {
+        } catch ProfileKeyManager.ProfileKeyError.missingKey {
+            // Only a genuinely absent key may be regenerated. A corrupt or
+            // unreadable key file must surface loudly — overwriting it would
+            // orphan the vault and both SQLCipher databases.
             rawKey = try await keyManager.generateKey()
         }
 
@@ -107,9 +110,13 @@ public actor RuntimeAssembly {
         at saltURL: URL,
         useCompleteProtection: Bool
     ) throws -> Data {
-        if FileManager.default.fileExists(atPath: saltURL.path),
-           let salt = try? Data(contentsOf: saltURL),
-           salt.count == 16 {
+        if FileManager.default.fileExists(atPath: saltURL.path) {
+            // Fail closed: a corrupt or truncated salt must never be silently
+            // replaced — regenerating would orphan every stored row while
+            // destroying the only recovery material.
+            guard let salt = try? Data(contentsOf: saltURL), salt.count == 16 else {
+                throw SaltError.corruptSalt
+            }
             return salt
         }
 
@@ -138,6 +145,7 @@ public actor RuntimeAssembly {
 
     private enum SaltError: Error {
         case generationFailed
+        case corruptSalt
     }
 
     public enum AssemblyError: Error {

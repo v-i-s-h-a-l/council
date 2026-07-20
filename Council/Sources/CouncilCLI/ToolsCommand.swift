@@ -134,18 +134,23 @@ private final class DecisionBox: @unchecked Sendable {
     func append(_ decision: ToolAccessDecision) { decisions.append(decision) }
 }
 
-private func audit(
-    decisions: [ToolAccessDecision],
-    assembly: RuntimeAssembly,
-    server: String
-) async {
-    // Log only the executable basename, never the full command line: commands
-    // may embed environment variables or arguments that must not persist in
-    // the audit chain. Leading `env` wrappers and VAR=value assignment
-    // prefixes are skipped so `API_KEY=secret server` cannot leak the secret.
+/// Extracts the executable basename used as the `server` label in tool-call
+/// audit payloads. Only the basename is ever persisted, never the full command
+/// line: commands may embed environment variables or arguments that must not
+/// reach the audit chain. Leading `env` wrappers (including env's own flags
+/// such as `-i`) and `VAR=value` assignment prefixes are skipped so
+/// `env API_KEY=secret server` can neither leak the secret nor be mislabeled
+/// as a flag.
+func auditServerLabel(_ server: String) -> String {
     let tokens = server.split(separator: " ").map(String.init)
     var executableIndex = 0
-    if tokens.first == "env" { executableIndex = 1 }
+    if tokens.first == "env" {
+        executableIndex = 1
+        // Skip env's own options (e.g. -i, -u, -0): they are flags, not the server.
+        while executableIndex < tokens.count, tokens[executableIndex].hasPrefix("-") {
+            executableIndex += 1
+        }
+    }
     let envAssignment = try? NSRegularExpression(pattern: #"^[A-Za-z_][A-Za-z0-9_]*="#)
     while executableIndex < tokens.count,
           envAssignment?.firstMatch(
@@ -154,9 +159,16 @@ private func audit(
           ) != nil {
         executableIndex += 1
     }
-    let serverLabel = executableIndex < tokens.count
-        ? URL(fileURLWithPath: tokens[executableIndex]).lastPathComponent
-        : "unknown"
+    guard executableIndex < tokens.count else { return "unknown" }
+    return URL(fileURLWithPath: tokens[executableIndex]).lastPathComponent
+}
+
+private func audit(
+    decisions: [ToolAccessDecision],
+    assembly: RuntimeAssembly,
+    server: String
+) async {
+    let serverLabel = auditServerLabel(server)
     for decision in decisions {
         var payload: [String: String] = [
             "server": serverLabel,

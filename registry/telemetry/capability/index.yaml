@@ -1,3 +1,10 @@
+- event_id: ci-e8b79e22-0b0e-4ec5-a102-83ab29667c7a
+  timestamp: '2026-07-19T23:58:53Z'
+  capability_id: capability-apple-native-development
+  task_ref: issue-40
+  outcome: routed
+  accepted: true
+  path: registry/telemetry/capability/capability-apple-native-development/2026-07-19T23-58-53Z_ci-e8b79e22-0b0e-4ec5-a102-83ab29667c7a.yaml
 - event_id: metric-capability-client-orchestrator-2026-07-19T02:54:53.631254+00:00-1
   timestamp: '2026-07-19T02:54:53.709695+00:00'
   capability_id: capability-client-orchestrator
