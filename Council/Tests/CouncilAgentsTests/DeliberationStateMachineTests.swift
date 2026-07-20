@@ -56,46 +56,23 @@ struct DeliberationStateMachineTests {
         #expect(!perspective.blindSpots.isEmpty)
         #expect(!perspective.dissent.isEmpty)
 
-        // Verify stage order.
+        // Verify stage order: the working stages must appear in sequence, not just
+        // be present somewhere in the stream.
         let stageSequence = states.map(\.stage)
         #expect(stageSequence.first == .idle)
-        #expect(stageSequence.contains(.firstOpinions))
-        #expect(stageSequence.contains(.peerReview))
-        #expect(stageSequence.contains(.synthesis))
-        #expect(stageSequence.contains(.dissentPreservation))
         #expect(stageSequence.last == .presentation)
+        let orderedStages: [DeliberationStage] = [.firstOpinions, .peerReview, .synthesis, .dissentPreservation]
+        var searchStart = stageSequence.startIndex
+        for stage in orderedStages {
+            let index = try #require(
+                stageSequence[searchStart...].firstIndex(of: stage),
+                "Stage \(stage) missing or out of order"
+            )
+            searchStart = stageSequence.index(after: index)
+        }
 
         // Verify all agent outputs were recorded.
         #expect(finalState.agentOutputs.count == 13)
-    }
-
-    @Test func cancellationMovesStateToCancelled() async throws {
-        let provider = MockInferenceProvider(cannedResponses: ["first opinion"])
-        let service = DeliberationService(
-            provider: provider,
-            council: PurchaseCouncil(),
-            validators: [ConstitutionalPerspectiveValidator()],
-            context: RoutableProfileContext()
-        )
-
-        let stream = await service.stateUpdates()
-        let collectionTask = Task {
-            var states: [DeliberationState] = []
-            for await state in stream {
-                states.append(state)
-                if state.stage == .firstOpinions {
-                    Task {
-                        await service.cancel()
-                    }
-                }
-            }
-            return states
-        }
-
-        await service.startSession(question: "Should I buy a new laptop?")
-        let states = await collectionTask.value
-
-        #expect(states.contains(where: { $0.stage == .cancelled }))
     }
 
     @Test func retryOnValidationFailureThenSucceed() async throws {

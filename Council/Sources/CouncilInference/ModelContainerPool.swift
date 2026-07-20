@@ -37,6 +37,7 @@ public actor ModelContainerPool {
     private var busy: Set<Int>
     private let manifestService: ModelManifestService
     private let loadWorker: @Sendable () async throws -> ModelContainerWorker
+    private let thermalStateProvider: @Sendable () -> ProcessInfo.ThermalState
 
     /// Creates a new pool.
     ///
@@ -48,17 +49,22 @@ public actor ModelContainerPool {
     ///     consented, and has a registered checksum.
     ///   - loadWorker: Optional factory for creating a worker. Tests can inject
     ///     a stub factory to avoid loading real MLX models.
+    ///   - thermalStateProvider: Optional override for the device thermal
+    ///     state. Tests can inject a fixed state to exercise the thermal
+    ///     budget gate. Defaults to `ProcessInfo.processInfo.thermalState`.
     public init(
         poolSize: Int? = nil,
         modelConfiguration: MLXModelConfiguration = .default,
         manifestService: ModelManifestService = ModelManifestService(),
-        loadWorker: (@Sendable () async throws -> ModelContainerWorker)? = nil
+        loadWorker: (@Sendable () async throws -> ModelContainerWorker)? = nil,
+        thermalStateProvider: (@Sendable () -> ProcessInfo.ThermalState)? = nil
     ) {
         self.poolSize = poolSize ?? Self.defaultPoolSize
         self.modelConfiguration = modelConfiguration
         self.workers = Array(repeating: nil, count: self.poolSize)
         self.busy = []
         self.manifestService = manifestService
+        self.thermalStateProvider = thermalStateProvider ?? { ProcessInfo.processInfo.thermalState }
         self.loadWorker = loadWorker ?? { [modelConfiguration, manifestService] in
             let modelID = modelConfiguration.modelConfiguration.name
             let consented = await manifestService.isModelConsented(id: modelID)
@@ -77,7 +83,7 @@ public actor ModelContainerPool {
 
     /// Current thermal state of the device.
     public var thermalBudget: ProcessInfo.ThermalState {
-        ProcessInfo.processInfo.thermalState
+        thermalStateProvider()
     }
 
     /// Borrows an available worker, loading one lazily if needed.
@@ -101,11 +107,24 @@ public actor ModelContainerPool {
             guard !busy.contains(index) else { continue }
 
             if workers[index] == nil {
-                let worker = try await loadWorker()
-                if await worker.hasRealContainer() {
-                    try await verify(worker: worker, modelID: modelID)
+                // Reserve the slot before suspending on load/verification.
+                // `borrow()` is reentrant while awaiting `loadWorker()` or
+                // `verify(...)`; without the reservation a concurrent borrow
+                // would find the slot still nil and load a second multi-GB
+                // worker into it, then overwrite `workers[index]` after the
+                // first worker was already handed out.
+                busy.insert(index)
+                do {
+                    let worker = try await loadWorker()
+                    if await worker.hasRealContainer() {
+                        try await verify(worker: worker, modelID: modelID)
+                    }
+                    workers[index] = worker
+                } catch {
+                    busy.remove(index)
+                    throw error
                 }
-                workers[index] = worker
+                return workers[index]!
             }
 
             let worker = workers[index]!

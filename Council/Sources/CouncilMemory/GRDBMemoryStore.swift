@@ -155,8 +155,17 @@ public actor GRDBMemoryStore: MemoryStore {
     // MARK: - Facts
 
     public func temporalFacts(for purpose: AccessPurpose) async throws -> [TemporalFact] {
-        try await temporalFacts(matching: MemoryFilter(purposes: [purpose]))
-            .filter { !$0.isLocked && $0.accessScope.contains(purpose) && !$0.deniedPurposes.contains(purpose) }
+        let now = Date()
+        return try await temporalFacts(matching: MemoryFilter(purposes: [purpose]))
+            .filter { fact in
+                !fact.isLocked
+                    && fact.accessScope.contains(purpose)
+                    && !fact.deniedPurposes.contains(purpose)
+                    // Facts outside their validity window are stale and must not be
+                    // routed into agent context.
+                    && (fact.validFrom.map { $0 <= now } ?? true)
+                    && (fact.validUntil.map { $0 > now } ?? true)
+            }
     }
 
     public func temporalFacts(matching filter: MemoryFilter) async throws -> [TemporalFact] {
@@ -226,16 +235,25 @@ public actor GRDBMemoryStore: MemoryStore {
         let saltURL = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("salt.bin")
         let saltKeychainItem = KeychainItem(service: "com.council.memory.salt", account: path)
 
-        if FileManager.default.fileExists(atPath: saltURL.path),
-           let salt = try? Data(contentsOf: saltURL),
-           salt.count == 16 {
-            return salt
+        var saltFileIsCorrupt = false
+        if FileManager.default.fileExists(atPath: saltURL.path) {
+            if let salt = try? Data(contentsOf: saltURL), salt.count == 16 {
+                return salt
+            }
+            // The salt file exists but is unreadable or truncated. Generating a
+            // fresh salt here would silently rekey the database and orphan every
+            // previously stored row; try the keychain copy, then fail closed.
+            saltFileIsCorrupt = true
         }
 
         if let salt = try saltKeychainItem.load(), salt.count == 16 {
             // Restore the salt to the file as defense-in-depth.
             try? salt.write(to: saltURL, options: .completeFileProtectionUnlessOpen)
             return salt
+        }
+
+        if saltFileIsCorrupt {
+            throw GRDBMemoryStoreError.invalidSaltLength
         }
 
         let salt = try generateRandomSalt()
@@ -394,7 +412,15 @@ extension TemporalFactRecord {
         let decoder = JSONDecoder()
         let objectData = try FieldEncryption.decrypt(ciphertext: objectEncrypted, key: key)
         let object = String(data: objectData, encoding: .utf8) ?? ""
-        let accessScope = try decoder.decode([AccessPurpose].self, from: Data(accessScopeJSON.utf8))
+        let accessScope: [AccessPurpose]
+        if let decoded = try? decoder.decode([AccessPurpose].self, from: Data(accessScopeJSON.utf8)) {
+            accessScope = decoded
+        } else {
+            // Fail CLOSED on a corrupt scope payload, mirroring the deniedPurposesJSON
+            // policy below: an empty scope authorizes nothing, so one damaged row can
+            // neither become routable nor take down every fetch with a throw.
+            accessScope = []
+        }
         // deniedPurposesJSON is NOT NULL DEFAULT '[]' (v2 migration); tolerate that default,
         // but fail CLOSED on a corrupt non-default payload so a damaged deny set can never
         // silently become routable.

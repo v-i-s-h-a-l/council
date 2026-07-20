@@ -4,7 +4,8 @@ import Foundation
 /// Builds inference-message arrays for agents.
 ///
 /// `PromptBuilder` receives only `RoutableProfileContext`, so `ClientConfidentialContainer`
-/// contents can never appear in prompts.
+/// contents can never appear in prompts. Profile items are additionally re-filtered
+/// against the role's access purpose before encoding (see `filter(_:for:)`).
 public enum PromptBuilder {
     /// Builds the complete message list for an agent at a given deliberation stage.
     public static func messages(
@@ -16,7 +17,8 @@ public enum PromptBuilder {
         priorOutputs: [AgentOutput]
     ) -> [InferenceMessage] {
         let preamble = (try? ConstitutionLoader.loadBundledText()) ?? ""
-        let profileSnippet = Self.encodedString(context)
+        let filteredContext = Self.filter(context, for: role.accessPurpose)
+        let profileSnippet = Self.encodedString(filteredContext)
         let priorSnippet = Self.formatPriorOutputs(priorOutputs)
 
         return [
@@ -38,6 +40,28 @@ public enum PromptBuilder {
         } catch {
             return ""
         }
+    }
+
+    /// Re-filters profile items against the role's access purpose as defense in depth.
+    /// Callers are expected to pass a purpose-filtered context (see
+    /// `ProfileService.routableContext(purposes:)`), whose filtering rule this mirrors;
+    /// an unfiltered `RoutableProfileContext(profile:)` must never widen what reaches
+    /// the model, so scoped-out or purpose-denied items are dropped here too.
+    private static func filter(_ context: RoutableProfileContext, for purpose: AccessPurpose) -> RoutableProfileContext {
+        func isAllowed(accessScope: [AccessPurpose], deniedPurposes: [AccessPurpose]) -> Bool {
+            accessScope.contains(purpose) && !deniedPurposes.contains(purpose)
+        }
+        return RoutableProfileContext(
+            values: context.values.filter {
+                isAllowed(accessScope: $0.accessScope, deniedPurposes: $0.deniedPurposes)
+            },
+            goals: context.goals.filter {
+                isAllowed(accessScope: $0.accessScope, deniedPurposes: $0.deniedPurposes)
+            },
+            boundaries: context.boundaries.filter {
+                isAllowed(accessScope: $0.accessScope, deniedPurposes: $0.deniedPurposes)
+            }
+        )
     }
 
     private static func formatPriorOutputs(_ outputs: [AgentOutput]) -> String {

@@ -75,7 +75,8 @@ public enum PerspectiveParser {
     }
 
     public static func parseSynthesis(from raw: String) -> SynthesisOutput {
-        if let data = raw.data(using: .utf8),
+        let candidate = strippingCodeFence(raw)
+        if let data = candidate.data(using: .utf8),
            let decoded = try? JSONDecoder().decode(SynthesisOutput.self, from: data) {
             return decoded
         }
@@ -83,7 +84,8 @@ public enum PerspectiveParser {
     }
 
     public static func parseDissent(from raw: String) -> DissentOutput {
-        if let data = raw.data(using: .utf8),
+        let candidate = strippingCodeFence(raw)
+        if let data = candidate.data(using: .utf8),
            let decoded = try? JSONDecoder().decode(DissentOutput.self, from: data) {
             return decoded
         }
@@ -93,6 +95,20 @@ public enum PerspectiveParser {
             basis: "",
             conditions: ""
         )
+    }
+
+    /// Models frequently wrap JSON payloads in a Markdown code fence (```json … ```).
+    /// Strip the fence so the payload can decode; anything else is returned unchanged.
+    private static func strippingCodeFence(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("```") else { return raw }
+        var lines = trimmed.components(separatedBy: .newlines)
+        lines.removeFirst()
+        if let last = lines.last,
+           last.trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+            lines.removeLast()
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// Parses the Chair's raw synthesis into the final `Perspective`.
@@ -112,16 +128,34 @@ public enum PerspectiveParser {
     }
 
     /// Incorporates dissent-preservation agent outputs into a perspective.
+    ///
+    /// Dissent-preservation agents answer with the `DissentOutput` JSON schema;
+    /// each response is parsed and rendered as a readable note. Appending the raw
+    /// opinion strings would leak raw JSON blobs into the UI and persisted episodes.
     public static func incorporateDissent(
         into perspective: Perspective,
         dissentOutputs: [AgentOutput]
     ) -> Perspective {
         var updated = perspective
         let notes = dissentOutputs
-            .map { $0.opinion.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { formattedDissentNote(from: $0.opinion) }
             .filter { !$0.isEmpty }
         updated.dissent.append(contentsOf: notes)
         return updated
+    }
+
+    /// Renders one dissent-preservation response as a readable note. Plain-text
+    /// (non-JSON) responses are kept verbatim via `parseDissent`'s fallback.
+    private static func formattedDissentNote(from raw: String) -> String {
+        let dissent = parseDissent(from: raw)
+        var parts: [String] = [dissent.objection]
+        if !dissent.basis.isEmpty {
+            parts.append("Basis: \(dissent.basis)")
+        }
+        if !dissent.conditions.isEmpty {
+            parts.append("Conditions: \(dissent.conditions)")
+        }
+        return parts.joined(separator: "; ")
     }
 
     private static func rawTextSynthesis(_ raw: String) -> SynthesisOutput {

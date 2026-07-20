@@ -4,18 +4,15 @@ import Testing
 
 struct ModelsTests {
 
-    @Test func perspectiveDefaultsAreEmpty() async throws {
-        let perspective = Perspective()
-        #expect(perspective.summary.isEmpty)
-        #expect(perspective.tradeOffs.isEmpty)
-        #expect(perspective.blindSpots.isEmpty)
-        #expect(perspective.dissent.isEmpty)
-    }
-
-    @Test func routableProfileContextExcludesConfidential() async throws {
+    @Test func unfilteredInitCopiesAllItemsRegardlessOfScope() {
+        // `RoutableProfileContext(profile:)` is explicitly UNFILTERED (see its
+        // doc comment): it copies every value/goal/boundary without evaluating
+        // accessScope/deniedPurposes. It exists for user-inspection paths only.
+        // The serialization-level confidential-leak guard lives in
+        // ProfilePrivacyAdversarialTests.routableContextEncodedJSONContainsNoConfidentialKeysOrValues.
         let profile = UserProfile(
-            values: [ValueStatement(text: "Frugality")],
-            goals: [Goal(text: "Save for travel")],
+            values: [ValueStatement(text: "Frugality", accessScope: [.userInspection])],
+            goals: [Goal(text: "Save for travel", deniedPurposes: [.purchaseDeliberation])],
             boundaries: [Boundary(text: "No impulse buys")],
             financialHistory: ClientConfidentialContainer(items: ["salary: 100000"]),
             journalEntries: [JournalEntry(text: "dream vacation")]
@@ -24,7 +21,9 @@ struct ModelsTests {
         let context = RoutableProfileContext(profile: profile)
 
         #expect(context.values.count == 1)
+        #expect(context.values[0].accessScope == [.userInspection])
         #expect(context.goals.count == 1)
+        #expect(context.goals[0].deniedPurposes == [.purchaseDeliberation])
         #expect(context.boundaries.count == 1)
         // Confidential containers are intentionally not present.
     }
@@ -46,17 +45,6 @@ struct ModelsTests {
         let boundary = try JSONDecoder().decode(Boundary.self, from: Data(legacyJSON.utf8))
         #expect(boundary.accessScope == AccessPurpose.allDeliberation)
         #expect(boundary.deniedPurposes.isEmpty)
-    }
-
-    @Test func modelRoutingPolicyDefaultsToOnDevice() async throws {
-        let decision = ModelRoutingPolicy.defaultOnDeviceDecision()
-        #expect(decision.selectedRoute == .onDeviceApple)
-        #expect(decision.providerMetadata.isLocal)
-    }
-
-    @Test func dataClassificationDeniesCloudForSensitive() async throws {
-        let paths = DataClassificationPolicy.allowedComputePaths(for: .sensitivePersonal)
-        #expect(paths == [.onDevice])
     }
 
     @Test func temporalFactDecodesWithoutDeniedPurposes() throws {

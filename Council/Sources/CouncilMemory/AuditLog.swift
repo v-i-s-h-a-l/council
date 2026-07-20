@@ -81,12 +81,20 @@ public actor GRDBAuditLog: AuditLog {
     }
 
     public func append(_ entry: AuditEntry) async throws {
-        var mutableEntry = entry
-        let previousHash = try await latestHash() ?? Self.genesisHash()
-        mutableEntry.previousHash = previousHash
-        mutableEntry.hmac = try Self.hmac(for: mutableEntry, key: hmacKey)
-
-        try await dbQueue.write { [hmacKey, mutableEntry] db in
+        // Read the chain tip and insert the new record inside ONE serialized write
+        // transaction. Reading the tip in a separate suspending read let concurrent
+        // appends interleave (actor reentrancy) and link two entries to the same
+        // tip, forking the chain. The chain follows insertion order (rowid), not
+        // wall-clock timestamp order, so a backdated entry extends the chain
+        // instead of breaking it.
+        try await dbQueue.write { [hmacKey] db in
+            var mutableEntry = entry
+            let previousHash = try AuditLogRecord
+                .order(Column("rowid").desc)
+                .fetchOne(db)?
+                .hmac ?? Self.genesisHash()
+            mutableEntry.previousHash = previousHash
+            mutableEntry.hmac = try Self.hmac(for: mutableEntry, key: hmacKey)
             var record = try AuditLogRecord(entry: mutableEntry, key: hmacKey)
             try record.save(db)
         }
@@ -111,6 +119,10 @@ public actor GRDBAuditLog: AuditLog {
         limit: Int?,
         includePayloads: Bool
     ) async throws -> [AuditEntry] {
+        // Clamp nonsense limits: a negative limit previously meant "unlimited" on
+        // the SQL path (LIMIT -1) but crashed the process on the payload path
+        // (Array.prefix(-1) traps).
+        let limit = limit.map { max(0, $0) }
         if includePayloads {
             let all = try await entries(for: nil)
             let filtered = since.map { sinceDate in
@@ -170,15 +182,12 @@ public actor GRDBAuditLog: AuditLog {
 
     // MARK: - Private helpers
 
-    private func latestHash() async throws -> String? {
-        let records = try await allRecordsOrdered()
-        return records.last?.hmac
-    }
-
+    /// Records in chain (insertion) order. The HMAC chain links entries in the
+    /// order they were appended, which is not necessarily timestamp order.
     private func allRecordsOrdered() async throws -> [AuditLogRecord] {
         try await dbQueue.read { db in
             try AuditLogRecord
-                .order(AuditLogRecord.Columns.timestamp)
+                .order(Column("rowid"))
                 .fetchAll(db)
         }
     }

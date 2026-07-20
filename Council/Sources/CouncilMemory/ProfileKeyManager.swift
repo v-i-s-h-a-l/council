@@ -11,6 +11,7 @@ import Security
 public actor ProfileKeyManager {
     public enum ProfileKeyError: Error {
         case missingKey
+        case corruptKey
         case keyGenerationFailed
     }
 
@@ -76,10 +77,15 @@ public actor ProfileKeyManager {
     /// Unwraps and returns the persisted profile key.
     public func unwrapKey() async throws -> Data {
         if let keyFileURL {
-            guard FileManager.default.fileExists(atPath: keyFileURL.path),
-                  let data = FileManager.default.contents(atPath: keyFileURL.path),
-                  data.count == 32 else {
+            guard FileManager.default.fileExists(atPath: keyFileURL.path) else {
                 throw ProfileKeyError.missingKey
+            }
+            guard let data = FileManager.default.contents(atPath: keyFileURL.path),
+                  data.count == 32 else {
+                // A present-but-malformed key file is NOT a missing key: treating it
+                // as missing would make the vault generate a fresh key and silently
+                // orphan every profile encrypted under the old one.
+                throw ProfileKeyError.corruptKey
             }
             return data
         }

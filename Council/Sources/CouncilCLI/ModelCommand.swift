@@ -75,11 +75,30 @@ extension ModelCommand {
         @Option(help: "SHA-256 checksum of the model artifacts.")
         var checksum: String
 
+        func validate() throws {
+            guard isValidSHA256Checksum(checksum) else {
+                throw ValidationError("--checksum must be a SHA-256 hex digest (64 hex characters, optionally prefixed with sha256:).")
+            }
+        }
+
         func run() async throws {
             let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
-            await assembly.manifestService.register(
-                ModelManifest(id: id, checksum: checksum)
-            )
+            await Self.register(id: id, checksum: checksum, manifestService: assembly.manifestService)
+        }
+
+        /// Registers a model manifest. Re-registering an id with a different
+        /// checksum revokes download consent: consent is bound to the artifacts
+        /// it was granted for, so swapped artifacts must be re-consented
+        /// explicitly instead of inheriting the old approval.
+        static func register(id: String, checksum: String, manifestService: ModelManifestService) async {
+            let previous = await manifestService.manifest(id: id)
+            await manifestService.register(ModelManifest(id: id, checksum: checksum))
+            if let previous, previous.checksum != checksum {
+                await manifestService.revokeConsent(id: id)
+                CLIAssembly.writeToStderr(
+                    "Checksum for \(id) changed; download consent revoked. Re-consent with 'council model consent \(id)'.\n"
+                )
+            }
         }
     }
 }
@@ -189,4 +208,13 @@ private struct ModelRow: Encodable {
     let checksum: String?
     let signature: String?
     let consented: Bool
+}
+
+/// Returns whether `value` is a well-formed SHA-256 checksum: exactly 64 hex
+/// characters, optionally prefixed with `sha256:`. Rejecting malformed
+/// checksums at the CLI boundary keeps typos from surfacing opaquely at model
+/// load time.
+func isValidSHA256Checksum(_ value: String) -> Bool {
+    let hex = value.hasPrefix("sha256:") ? String(value.dropFirst("sha256:".count)) : value
+    return hex.count == 64 && hex.allSatisfy { $0.isHexDigit }
 }

@@ -91,7 +91,14 @@ public actor MemoryService {
     /// decision is recorded in the audit log: one aggregate entry for the allowed
     /// facts and one entry per denied fact so users can verify exclusions.
     public func facts(subject: String? = nil, purposes: [AccessPurpose]) async throws -> [TemporalFact] {
+        let now = Date()
+        // Facts outside their validity window are stale: they are neither routed
+        // nor audited as denied — they are simply no longer current.
         let all = try await store.temporalFacts(matching: MemoryFilter(locked: false, subject: subject))
+            .filter { fact in
+                (fact.validFrom.map { $0 <= now } ?? true)
+                    && (fact.validUntil.map { $0 > now } ?? true)
+            }
         let request = Set(purposes)
         var allowed: [TemporalFact] = []
         var denied: [TemporalFact] = []

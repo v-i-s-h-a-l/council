@@ -24,8 +24,10 @@ struct ProfileMemoryAuditIntegrationTests {
             _ = try await keyManager.generateKey()
 
             let fileManager = FileManager()
-            let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            let testDir = appSupport.appendingPathComponent("CouncilIntegrationTests-\(UUID().uuidString)", isDirectory: true)
+            // Use the per-user temporary directory, not real Application Support:
+            // tests must not pollute shared user state or collide on parallel runs.
+            let testDir = fileManager.temporaryDirectory
+                .appendingPathComponent("CouncilIntegrationTests-\(UUID().uuidString)", isDirectory: true)
             let fileURL = testDir.appendingPathComponent("vault.enc")
             try fileManager.createDirectory(at: testDir, withIntermediateDirectories: true)
             let vault = CryptoKitProfileVault(keyManager: keyManager, fileURL: fileURL, fileManager: fileManager, writingOptions: [])
@@ -99,19 +101,31 @@ struct ProfileMemoryAuditIntegrationTests {
         #expect(try await root.auditLog.verifyChain())
     }
 
-    @Test func confidentialDataDoesNotLeakIntoAgentPrompts() async throws {
+    /// Exercises the real leak path end to end: a profile holding confidential
+    /// containers, purpose-scoped items, and purpose-denied items is round-tripped
+    /// through the real vault, the context is built via the FILTERED
+    /// `ProfileService.routableContext(purposes:)` API, and every agent's prompt is
+    /// checked for leaks. (The previous version built the context via the unfiltered
+    /// `RoutableProfileContext(profile:)` init and so could only ever assert the
+    /// type system's shape.)
+    @Test func scopedAndConfidentialDataDoesNotLeakIntoAgentPrompts() async throws {
         let root = try await TestCompositionRoot.make()
         defer { root.cleanup() }
 
         let profile = UserProfile(
-            values: [ValueStatement(text: "Privacy")],
+            values: [
+                ValueStatement(text: "routable-in-scope-value", accessScope: [.purchaseDeliberation]),
+                ValueStatement(text: "secret-inspection-only-value", accessScope: [.userInspection]),
+            ],
+            goals: [
+                Goal(text: "secret-denied-goal", deniedPurposes: [.purchaseDeliberation]),
+            ],
             financialHistory: ClientConfidentialContainer(items: ["salary: 1000000"]),
             journalEntries: [JournalEntry(text: "private journal entry")]
         )
         try await root.profileService.save(profile)
 
-        let loadedProfile = try await root.profileService.load()
-        let context = RoutableProfileContext(profile: loadedProfile)
+        let context = try await root.profileService.routableContext(purposes: [.purchaseDeliberation])
 
         let agents: [any Agent] = [
             FrugalAgent(),
@@ -129,6 +143,12 @@ struct ProfileMemoryAuditIntegrationTests {
                 priorOutputs: []
             )
             let combined = messages.map(\.content).joined(separator: "\n")
+            // In-scope items reach the model.
+            #expect(combined.contains("routable-in-scope-value"))
+            // Scoped-out and purpose-denied items never do.
+            #expect(!combined.contains("secret-inspection-only-value"))
+            #expect(!combined.contains("secret-denied-goal"))
+            // Confidential containers never do.
             #expect(!combined.contains("salary: 1000000"))
             #expect(!combined.contains("private journal entry"))
             #expect(!combined.contains("ClientConfidentialContainer"))

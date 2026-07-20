@@ -35,10 +35,16 @@ extension MemoryCommand {
         @Option(help: "Maximum number of entries to return.")
         var limit: Int = 20
 
+        func validate() throws {
+            guard limit >= 0 else {
+                throw ValidationError("--limit must be greater than or equal to 0.")
+            }
+        }
+
         func run() async throws {
             let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
             let episodes = try await assembly.memoryService.recentEpisodes(limit: limit)
-            printEpisodes(episodes, format: options.format, includePerspective: false)
+            try printEpisodes(episodes, format: options.format, includePerspective: false)
         }
     }
 }
@@ -65,7 +71,7 @@ extension MemoryCommand {
                 CLIAssembly.writeToStderr("No gist found with id \(id).\n")
                 throw ExitCode(1)
             }
-            printEpisodes([episode], format: options.format, includePerspective: true)
+            try printEpisodes([episode], format: options.format, includePerspective: true)
         }
     }
 }
@@ -89,10 +95,16 @@ extension MemoryCommand {
         @Option(help: "Maximum number of entries to return.")
         var limit: Int = 20
 
+        func validate() throws {
+            guard limit >= 0 else {
+                throw ValidationError("--limit must be greater than or equal to 0.")
+            }
+        }
+
         func run() async throws {
             let assembly = try await CLIAssembly.makeRuntimeAssembly(options: options)
             let episodes = try await assembly.memoryService.searchEpisodes(query: query, limit: limit)
-            printEpisodes(episodes, format: options.format, includePerspective: false)
+            try printEpisodes(episodes, format: options.format, includePerspective: false)
         }
     }
 }
@@ -188,7 +200,7 @@ private func printEpisodes(
     _ episodes: [EpisodicGist],
     format: CLIOutputFormat,
     includePerspective: Bool
-) {
+) throws {
     switch format {
     case .text, .markdown:
         for episode in episodes {
@@ -198,17 +210,26 @@ private func printEpisodes(
             }
         }
     case .json:
-        let rows = episodes.map { episode in
-            EpisodeRow(
-                id: episode.id,
-                sessionID: episode.sessionID,
-                createdAt: episode.createdAt,
-                question: episode.question,
-                perspective: includePerspective ? episode.perspective : nil
-            )
-        }
-        print(try! CLIEncoder.json(rows))
+        print(try episodeJSON(episodes, includePerspective: includePerspective))
     }
+}
+
+/// Renders episodes as JSON for `--format json` output.
+///
+/// This must never be a force-try: episode rows come from the persisted store,
+/// and a tampered or corrupt row must surface as a thrown error, not crash the
+/// process.
+func episodeJSON(_ episodes: [EpisodicGist], includePerspective: Bool) throws -> String {
+    let rows = episodes.map { episode in
+        EpisodeRow(
+            id: episode.id,
+            sessionID: episode.sessionID,
+            createdAt: episode.createdAt,
+            question: episode.question,
+            perspective: includePerspective ? episode.perspective : nil
+        )
+    }
+    return try CLIEncoder.json(rows)
 }
 
 private struct EpisodeRow: Encodable {

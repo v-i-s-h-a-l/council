@@ -4,7 +4,7 @@ import XCTest
 
 final class ModelManifestServiceTests: XCTestCase {
     func testConsentGrantAndRevoke() async {
-        let service = ModelManifestService()
+        let service = makeIsolatedManifestService(ids: ["model-a"])
 
         await service.grantConsent(id: "model-a")
         let consented = await service.isModelConsented(id: "model-a")
@@ -22,7 +22,7 @@ final class ModelManifestServiceTests: XCTestCase {
     }
 
     func testChecksumRegistrationAndValidation() async {
-        let service = ModelManifestService()
+        let service = makeIsolatedManifestService()
         let manifest = ModelManifest(
             id: "model-a",
             checksum: "sha256:abc123",
@@ -73,9 +73,95 @@ final class ModelManifestServiceTests: XCTestCase {
     }
 
     func testMissingChecksumReturnsNil() async {
-        let service = ModelManifestService()
+        let service = makeIsolatedManifestService()
         let checksum = await service.checksum(for: "not-registered")
         XCTAssertNil(checksum)
+    }
+
+    // MARK: - ModelManifestService adversarial
+
+    /// Tampered persisted state: if the persisted manifests blob is garbage,
+    /// the service must fail closed — the entire trust registry is dropped
+    /// (checksums become nil, so downloads are blocked) rather than crashing
+    /// or trusting partial data. Consent lives under separate keys and
+    /// survives. This silent-drop behavior is the conscious contract of the
+    /// `try?` in `ModelManifestService.init`.
+    func testCorruptPersistedManifestDataFailsClosed() async {
+        let suiteKey = "com.council.test.\(UUID().uuidString)"
+        let manifestsKey = "\(suiteKey).manifests"
+        let consentKey = "\(suiteKey).consent.model-a"
+        defer {
+            UserDefaults.standard.removeObject(forKey: manifestsKey)
+            UserDefaults.standard.removeObject(forKey: consentKey)
+        }
+
+        // Persist garbage under the manifests key, plus a live consent flag.
+        UserDefaults.standard.set(Data("not a manifest payload".utf8), forKey: manifestsKey)
+        UserDefaults.standard.set(true, forKey: consentKey)
+
+        let service = ModelManifestService(suiteKey: suiteKey)
+
+        // Fail closed: no trust material is recovered from the corrupt blob.
+        let checksum = await service.checksum(for: "model-a")
+        XCTAssertNil(checksum)
+        let manifests = await service.allManifests()
+        XCTAssertTrue(manifests.isEmpty)
+
+        // Consent is keyed separately and is not wiped by the corrupt blob.
+        let consented = await service.isModelConsented(id: "model-a")
+        XCTAssertTrue(consented)
+
+        // The service stays usable: new registrations persist normally.
+        await service.register(ModelManifest(id: "model-b", checksum: "sha256:def456"))
+        let reloaded = ModelManifestService(suiteKey: suiteKey)
+        let recovered = await reloaded.checksum(for: "model-b")
+        XCTAssertEqual(recovered, "sha256:def456")
+    }
+
+    /// Pins the current overwrite contract of `register`: re-registering a
+    /// model with a bare manifest silently strips previously registered
+    /// checksum/signature trust material. Callers must always re-supply
+    /// trust material; `unregister` is the only removal API. If this test
+    /// starts failing because register learned to merge, that is a
+    /// deliberate hardening change — update this pin.
+    func testReRegisterWithNilChecksumStripsTrustMaterial() async {
+        let service = makeIsolatedManifestService()
+        await service.register(
+            ModelManifest(id: "model-a", checksum: "sha256:abc123", signature: "sig:xyz789")
+        )
+
+        await service.register(ModelManifest(id: "model-a"))
+
+        let checksum = await service.checksum(for: "model-a")
+        XCTAssertNil(checksum, "register overwrites wholesale; a nil checksum erases the registered one")
+        let signature = await service.signature(for: "model-a")
+        XCTAssertNil(signature, "register overwrites wholesale; a nil signature erases the registered one")
+        let manifest = await service.manifest(id: "model-a")
+        XCTAssertNotNil(manifest)
+    }
+
+    /// Pins the documented last-writer-wins hazard from the type's header
+    /// comment: concurrent instances over one suite hold stale snapshots and
+    /// overwrite each other. The RuntimeAssembly contract is a single
+    /// long-lived instance per suite.
+    func testConcurrentInstancesOverwriteLastWriterWins() async {
+        let suiteKey = "com.council.test.\(UUID().uuidString)"
+        let manifestsKey = "\(suiteKey).manifests"
+        defer { UserDefaults.standard.removeObject(forKey: manifestsKey) }
+
+        let first = ModelManifestService(suiteKey: suiteKey)
+        let second = ModelManifestService(suiteKey: suiteKey)
+
+        // Both instances loaded an empty snapshot; each persists its own
+        // snapshot plus its new entry, so the second write erases the first.
+        await first.register(ModelManifest(id: "model-a", checksum: "sha256:aaa"))
+        await second.register(ModelManifest(id: "model-b", checksum: "sha256:bbb"))
+
+        let reloaded = ModelManifestService(suiteKey: suiteKey)
+        let manifests = await reloaded.allManifests()
+        XCTAssertEqual(manifests.map(\.id), ["model-b"])
+        let lost = await reloaded.checksum(for: "model-a")
+        XCTAssertNil(lost, "Last writer wins: the first instance's registration is silently lost")
     }
 
     // MARK: - ModelArtifactVerifier
@@ -258,6 +344,20 @@ final class ModelManifestServiceTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// Manifest service over a unique suite so tests never touch the
+    /// production `com.council.modelManifest` keys; keys are removed on
+    /// teardown.
+    private func makeIsolatedManifestService(ids: [String] = []) -> ModelManifestService {
+        let suiteKey = "com.council.test.\(UUID().uuidString)"
+        addTeardownBlock {
+            UserDefaults.standard.removeObject(forKey: "\(suiteKey).manifests")
+            for id in ids {
+                UserDefaults.standard.removeObject(forKey: "\(suiteKey).consent.\(id)")
+            }
+        }
+        return ModelManifestService(suiteKey: suiteKey)
+    }
 
     private func makeTempDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory

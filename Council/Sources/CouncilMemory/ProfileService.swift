@@ -5,8 +5,36 @@ import Foundation
 public actor ProfileService {
     private let vault: any ProfileVault
 
+    /// Tail of the mutation chain serializing load→mutate→save cycles.
+    ///
+    /// `ProfileService` is an actor, but every mutation suspends while talking to the
+    /// vault, and actors are reentrant: without this chain, two concurrent mutations
+    /// can load the same base profile and the later save silently overwrites the
+    /// earlier one (a lost update).
+    private var mutationTail: Task<Void, Error>?
+
     public init(vault: any ProfileVault) {
         self.vault = vault
+    }
+
+    /// Runs `mutation` against the freshest persisted profile, strictly after every
+    /// previously enqueued mutation has settled.
+    private func mutateProfile(_ mutation: @escaping @Sendable (inout UserProfile) -> Void) async throws {
+        let tail = mutationTail
+        let vault = self.vault
+        // Detached so the task captures neither the actor nor its isolation (which
+        // would retain a cycle through `mutationTail`); ordering comes from awaiting
+        // the previous tail, not from actor isolation.
+        let task: Task<Void, Error> = Task.detached {
+            // Wait for the previous mutation to settle (errors included) so this
+            // mutation always starts from the freshest persisted profile.
+            _ = try? await tail?.value
+            var profile = try await vault.load()
+            mutation(&profile)
+            try await vault.save(profile)
+        }
+        mutationTail = task
+        try await task.value
     }
 
     /// Whether the underlying vault is bound to the Secure Enclave.
@@ -35,22 +63,18 @@ public actor ProfileService {
         accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
         deniedPurposes: [AccessPurpose] = []
     ) async throws -> ValueStatement {
-        var profile = try await load()
         let statement = ValueStatement(
             text: text,
             tags: tags,
             accessScope: accessScope,
             deniedPurposes: deniedPurposes
         )
-        profile.values.append(statement)
-        try await save(profile)
+        try await mutateProfile { $0.values.append(statement) }
         return statement
     }
 
     public func removeValue(id: UUID) async throws {
-        var profile = try await load()
-        profile.values.removeAll { $0.id == id }
-        try await save(profile)
+        try await mutateProfile { $0.values.removeAll { $0.id == id } }
     }
 
     // MARK: - Goal management
@@ -64,7 +88,6 @@ public actor ProfileService {
         accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
         deniedPurposes: [AccessPurpose] = []
     ) async throws -> Goal {
-        var profile = try await load()
         let goal = Goal(
             text: text,
             timeframe: timeframe,
@@ -73,15 +96,12 @@ public actor ProfileService {
             accessScope: accessScope,
             deniedPurposes: deniedPurposes
         )
-        profile.goals.append(goal)
-        try await save(profile)
+        try await mutateProfile { $0.goals.append(goal) }
         return goal
     }
 
     public func removeGoal(id: UUID) async throws {
-        var profile = try await load()
-        profile.goals.removeAll { $0.id == id }
-        try await save(profile)
+        try await mutateProfile { $0.goals.removeAll { $0.id == id } }
     }
 
     // MARK: - Boundary management
@@ -94,7 +114,6 @@ public actor ProfileService {
         accessScope: [AccessPurpose] = AccessPurpose.allDeliberation,
         deniedPurposes: [AccessPurpose] = []
     ) async throws -> Boundary {
-        var profile = try await load()
         let boundary = Boundary(
             text: text,
             tags: tags,
@@ -102,15 +121,12 @@ public actor ProfileService {
             accessScope: accessScope,
             deniedPurposes: deniedPurposes
         )
-        profile.boundaries.append(boundary)
-        try await save(profile)
+        try await mutateProfile { $0.boundaries.append(boundary) }
         return boundary
     }
 
     public func removeBoundary(id: UUID) async throws {
-        var profile = try await load()
-        profile.boundaries.removeAll { $0.id == id }
-        try await save(profile)
+        try await mutateProfile { $0.boundaries.removeAll { $0.id == id } }
     }
 
     // MARK: - Journal management
@@ -121,17 +137,13 @@ public actor ProfileService {
         createdAt: Date = Date(),
         tags: [String] = []
     ) async throws -> JournalEntry {
-        var profile = try await load()
         let entry = JournalEntry(text: text, createdAt: createdAt, tags: tags)
-        profile.journalEntries.append(entry)
-        try await save(profile)
+        try await mutateProfile { $0.journalEntries.append(entry) }
         return entry
     }
 
     public func removeJournalEntry(id: UUID) async throws {
-        var profile = try await load()
-        profile.journalEntries.removeAll { $0.id == id }
-        try await save(profile)
+        try await mutateProfile { $0.journalEntries.removeAll { $0.id == id } }
     }
 
     public func journalEntries(

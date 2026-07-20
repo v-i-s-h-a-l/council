@@ -34,6 +34,14 @@ extension AuditCommand {
         @Flag(help: "Include decrypted payloads in the output.")
         var includePayloads = false
 
+        func validate() throws {
+            // A negative limit reaches SQL as `LIMIT -1`, which SQLite treats as
+            // no limit at all — an unbounded dump of the audit log.
+            if let limit, limit < 0 {
+                throw ValidationError("--limit must be greater than or equal to 0.")
+            }
+        }
+
         func run() async throws {
             let sinceDate: Date?
             if let since {

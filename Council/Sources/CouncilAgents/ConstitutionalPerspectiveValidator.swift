@@ -24,6 +24,10 @@ public struct ConstitutionalPerspectiveValidator: PerspectiveValidator {
         ]
         .joined(separator: " ")
         .lowercased()
+        // Normalize all whitespace runs (newlines, double spaces, NBSP, …) to single
+        // spaces; otherwise "buy\nit" or "buy  it" would evade the substring checks.
+        .split(whereSeparator: { $0.isWhitespace })
+        .joined(separator: " ")
 
         if forbiddenPhrases.contains(where: searchableText.contains) {
             return .invalid(reason: PerspectiveValidationError.verdictLanguageDetected.errorDescription ?? "Verdict language detected")

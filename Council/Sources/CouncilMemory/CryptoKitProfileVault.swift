@@ -84,16 +84,7 @@ public actor CryptoKitProfileVault: ProfileVault {
             try encrypted.write(to: fileURL)
         }
 
-        // Defense-in-depth: ensure the encrypted vault is readable only by the owner.
-        try fileManager.setAttributes(
-            [FileAttributeKey.posixPermissions: 0o600],
-            ofItemAtPath: fileURL.path
-        )
-
-        var resourceValues = URLResourceValues()
-        resourceValues.isExcludedFromBackup = true
-        var directoryURL = directory
-        try directoryURL.setResourceValues(resourceValues)
+        try hardenVaultFile()
     }
 
     public func exportEncryptedBlob() async throws -> Data {
@@ -111,7 +102,27 @@ public actor CryptoKitProfileVault: ProfileVault {
             withIntermediateDirectories: true,
             attributes: nil
         )
-        try data.write(to: fileURL, options: writingOptions)
+        do {
+            try data.write(to: fileURL, options: writingOptions)
+        } catch {
+            // Same entitlement fallback as save(_:).
+            try data.write(to: fileURL)
+        }
+        try hardenVaultFile()
+    }
+
+    /// Defense-in-depth hardening shared by `save` and `replaceFromEncryptedBlob`:
+    /// owner-only permissions on the vault file and backup exclusion for its directory.
+    private func hardenVaultFile() throws {
+        try fileManager.setAttributes(
+            [FileAttributeKey.posixPermissions: 0o600],
+            ofItemAtPath: fileURL.path
+        )
+
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        var directoryURL = fileURL.deletingLastPathComponent()
+        try directoryURL.setResourceValues(resourceValues)
     }
 
     private func existingOrGeneratedKey() async throws -> Data {

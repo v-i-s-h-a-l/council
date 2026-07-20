@@ -1,4 +1,6 @@
 import CouncilCore
+import CouncilMemory
+import CouncilTestUtilities
 import Foundation
 import Testing
 
@@ -33,18 +35,23 @@ struct PromptLeakageTests {
         #expect(!json.contains("ClientConfidentialContainer"))
     }
 
-    @Test func renderedPromptFromRoutableContextNeverContainsConfidentialData() async throws {
+    @Test func renderedPromptFromPurposeFilteredContextExcludesDeniedAndConfidentialData() async throws {
         let profile = UserProfile(
-            values: [ValueStatement(text: "Frugality")],
+            values: [
+                ValueStatement(text: "Frugality"),
+                ValueStatement(text: "Secret salary talk", deniedPurposes: [.purchaseDeliberation]),
+            ],
             goals: [Goal(text: "Save for travel")],
             boundaries: [Boundary(text: "No impulse buys")],
             financialHistory: ClientConfidentialContainer(items: ["salary: 100000"]),
             journalEntries: [JournalEntry(text: "private dream")]
         )
-        let context = RoutableProfileContext(profile: profile)
+        let service = ProfileService(vault: MockProfileVault(profile: profile))
 
-        // Simulate the prompt construction that agents perform: encode the routable context
-        // and include it in a user message along with the question.
+        // Differentiated from the test above: this goes through the PBAC-filtered
+        // routableContext(purposes:) path that real prompt construction must use,
+        // so purpose-denied items are excluded in addition to confidential ones.
+        let context = try await service.routableContext(purposes: [.purchaseDeliberation])
         let contextJSON = String(data: try JSONEncoder().encode(context), encoding: .utf8) ?? ""
         let prompt = """
             Question: Should I buy a car?
@@ -55,6 +62,11 @@ struct PromptLeakageTests {
 
         #expect(!prompt.contains("salary: 100000"))
         #expect(!prompt.contains("private dream"))
+        #expect(!prompt.contains("Secret salary talk"))
         #expect(!prompt.contains("ClientConfidentialContainer"))
+        // Allowed items still reach the prompt.
+        #expect(prompt.contains("Frugality"))
+        #expect(prompt.contains("Save for travel"))
+        #expect(prompt.contains("No impulse buys"))
     }
 }
