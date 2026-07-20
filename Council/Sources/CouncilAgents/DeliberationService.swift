@@ -73,6 +73,10 @@ private actor DeliberationActor {
 
     func stateUpdates() -> AsyncStream<DeliberationState> {
         let (stream, continuation) = AsyncStream.makeStream(of: DeliberationState.self)
+        // Finish any prior subscription: replacing the stored continuation
+        // would otherwise leave the old stream hanging forever (leaked storage
+        // and a spinning consumer).
+        stateContinuation?.finish()
         self.stateContinuation = continuation
         continuation.yield(state)
         return stream

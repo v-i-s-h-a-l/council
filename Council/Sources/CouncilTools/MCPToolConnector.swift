@@ -68,9 +68,16 @@ public actor MCPToolConnector: ToolConnector {
             throw ToolConnectorError.protocolError("tools/list response missing 'tools' array")
         }
         return tools.map { entry in
-            let schema = entry["inputSchema"]
-            let schemaString = (try? JSONSerialization.data(withJSONObject: schema ?? NSNull()))
-                .flatMap { String(data: $0, encoding: .utf8) }
+            // Only serialize genuine JSON objects/arrays: passing NSNull (or a
+            // scalar) as the top level raises an NSException on Darwin, which
+            // try? cannot catch — a malformed server would abort the process.
+            let schemaString: String?
+            if let schema = entry["inputSchema"], JSONSerialization.isValidJSONObject(schema),
+               let data = try? JSONSerialization.data(withJSONObject: schema) {
+                schemaString = String(data: data, encoding: .utf8)
+            } else {
+                schemaString = nil
+            }
             return ToolDescriptor(
                 name: entry["name"] as? String ?? "",
                 description: entry["description"] as? String,

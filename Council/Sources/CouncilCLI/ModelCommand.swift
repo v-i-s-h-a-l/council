@@ -93,7 +93,8 @@ extension ModelCommand {
         static func register(id: String, checksum: String, manifestService: ModelManifestService) async {
             let previous = await manifestService.manifest(id: id)
             await manifestService.register(ModelManifest(id: id, checksum: checksum))
-            if let previous, previous.checksum != checksum {
+            if let previous,
+               normalizedSHA256Digest(previous.checksum ?? "") != normalizedSHA256Digest(checksum) {
                 await manifestService.revokeConsent(id: id)
                 CLIAssembly.writeToStderr(
                     "Checksum for \(id) changed; download consent revoked. Re-consent with 'council model consent \(id)'.\n"
@@ -217,4 +218,13 @@ private struct ModelRow: Encodable {
 func isValidSHA256Checksum(_ value: String) -> Bool {
     let hex = value.hasPrefix("sha256:") ? String(value.dropFirst("sha256:".count)) : value
     return hex.count == 64 && hex.allSatisfy { $0.isHexDigit }
+}
+
+/// Returns the digest without its optional `sha256:` prefix, lowercased, so
+/// equivalent spellings of the same checksum compare equal (prefixed vs. bare
+/// vs. uppercase must not read as a checksum "change" and spuriously revoke
+/// consent).
+func normalizedSHA256Digest(_ value: String) -> String {
+    let lowered = value.lowercased()
+    return lowered.hasPrefix("sha256:") ? String(lowered.dropFirst("sha256:".count)) : lowered
 }

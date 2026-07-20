@@ -76,7 +76,8 @@ public extension AuditLog {
             all = all.filter { $0.timestamp >= since }
         }
         let sorted = all.sorted { $0.timestamp > $1.timestamp }
-        let limited = limit.map { Array(sorted.prefix($0)) } ?? sorted
+        // Negative limits would trap in prefix(); clamp like GRDBAuditLog.
+        let limited = limit.map { Array(sorted.prefix(max(0, $0))) } ?? sorted
         guard includePayloads else {
             // Payloads can carry memory-access details; honor the caller's
             // request to exclude them from exports and telemetry views.

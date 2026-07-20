@@ -50,13 +50,15 @@ public actor MemoryService {
     /// Returns recent unlocked episodic gists, newest first.
     public func recentEpisodes(limit: Int = 100) async throws -> [EpisodicGist] {
         let episodes = try await store.episodes(matching: MemoryFilter(locked: false))
-        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
+        // Negative limits would trap in prefix(); clamp defensively.
+        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(max(0, limit)).map { $0 }
     }
 
     /// Searches unlocked episodic gists by question substring, newest first.
     public func searchEpisodes(query: String, limit: Int = 100) async throws -> [EpisodicGist] {
         let episodes = try await store.episodes(matching: MemoryFilter(locked: false, subject: query))
-        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(limit).map { $0 }
+        // Negative limits would trap in prefix(); clamp defensively.
+        return episodes.sorted { $0.createdAt > $1.createdAt }.prefix(max(0, limit)).map { $0 }
     }
 
     // MARK: - Temporal fact management

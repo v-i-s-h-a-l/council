@@ -155,7 +155,8 @@ struct AskCommand: AsyncParsableCommand {
             // happens once consent is settled, so a rejected run leaves no
             // phantom manifest behind.
             let previous = await manifestService.manifest(id: modelID)
-            let checksumChanged = previous != nil && previous?.checksum != checksum
+            let checksumChanged = previous != nil
+                && previous?.checksum.map(normalizedSHA256Digest) != checksum.map(normalizedSHA256Digest)
 
             if consentDownload {
                 await manifestService.register(
