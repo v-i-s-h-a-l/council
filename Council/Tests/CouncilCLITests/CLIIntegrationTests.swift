@@ -362,6 +362,48 @@ struct CLIIntegrationTests {
         #expect(try await assembly.memoryService.verifyAuditChain())
     }
 
+    @Test("Assembly fails closed on a truncated salt file")
+    func assemblyFailsClosedOnCorruptSalt() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        // Truncated salt: 8 of 16 bytes.
+        try Data(repeating: 0xFF, count: 8).write(to: root.appendingPathComponent("salt.bin"))
+
+        // Regression: this used to silently regenerate the salt, orphaning every
+        // stored row while destroying the recovery material.
+        do {
+            _ = try await RuntimeAssembly(rootDirectory: root, useSecureEnclave: false)
+            Issue.record("A truncated salt.bin must fail assembly, not silently rekey")
+        } catch {
+            // Any thrown error is acceptable here; the critical property is that
+            // the corrupt salt was NOT overwritten.
+        }
+        let surviving = try Data(contentsOf: root.appendingPathComponent("salt.bin"))
+        #expect(surviving == Data(repeating: 0xFF, count: 8))
+    }
+
+    @Test("Assembly fails closed on a corrupt profile key file")
+    func assemblyFailsClosedOnCorruptProfileKey() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("council-cli-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("not-a-valid-key".utf8).write(to: root.appendingPathComponent("profile.key"))
+
+        // Regression: a corrupt key used to be treated as missing and overwritten,
+        // silently orphaning the encrypted profile vault.
+        do {
+            _ = try await RuntimeAssembly(rootDirectory: root, useSecureEnclave: false)
+            Issue.record("A corrupt profile.key must fail assembly, not silently rekey")
+        } catch {
+            // Expected: corruptKey surfaces.
+        }
+        let surviving = try Data(contentsOf: root.appendingPathComponent("profile.key"))
+        #expect(surviving == Data("not-a-valid-key".utf8))
+    }
+
     /// Writes a minimal newline-delimited JSON-RPC MCP fixture server.
     private func makeFixtureMCPServer(in directory: URL) throws -> URL {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

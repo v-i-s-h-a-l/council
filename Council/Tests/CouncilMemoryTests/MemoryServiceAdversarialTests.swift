@@ -62,4 +62,17 @@ struct MemoryServiceAdversarialTests {
         let facts = try await service.facts(subject: "user", purposes: [.purchaseDeliberation])
         #expect(facts.map(\.object) == ["Current thing"])
     }
+
+    @Test func negativeEpisodeLimitsReturnEmptyWithoutCrashing() async throws {
+        let store = MockMemoryStore()
+        try await store.saveEpisode(EpisodicGist(sessionID: UUID(), question: "Q?"))
+        let service = MemoryService(store: store, auditLog: MockAuditLog())
+
+        // Regression: prefix(-1) traps — negative limits must clamp to empty.
+        #expect(try await service.recentEpisodes(limit: -1).isEmpty)
+        #expect(try await service.searchEpisodes(query: "Q", limit: -5).isEmpty)
+        // Zero and positive limits still behave.
+        #expect(try await service.recentEpisodes(limit: 0).isEmpty)
+        #expect(try await service.recentEpisodes(limit: 1).count == 1)
+    }
 }

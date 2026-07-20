@@ -85,4 +85,15 @@ struct ModelCommandAdversarialTests {
         #expect(!isValidSHA256Checksum(String(repeating: "a", count: 63)))
         #expect(!isValidSHA256Checksum(String(repeating: "a", count: 65)))
     }
+
+    @Test("Equivalent checksum spellings normalize equal")
+    func checksumDigestNormalization() {
+        let bare = String(repeating: "ab", count: 32)
+        #expect(normalizedSHA256Digest("sha256:\(bare)") == bare)
+        #expect(normalizedSHA256Digest(bare) == bare)
+        #expect(normalizedSHA256Digest("SHA256:\(bare.uppercased())") == bare)
+        // Regression: prefixed/bare/uppercase spellings of the same digest used
+        // to compare unequal and spuriously revoke consent.
+        #expect(normalizedSHA256Digest("sha256:\(bare)") == normalizedSHA256Digest(bare))
+    }
 }
